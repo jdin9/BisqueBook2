@@ -4,6 +4,12 @@ import { PrismaClient } from "./generated/prisma/client";
 // an environment variable (e.g., PRISMA_CLIENT_ENGINE_TYPE=client) is present.
 process.env.PRISMA_CLIENT_ENGINE_TYPE ??= "binary";
 
+// Force Prisma to use the Node.js binary engine during local/server execution.
+// The "client" engine type requires Accelerate or an adapter, which isn't configured here.
+if (!process.env.PRISMA_CLIENT_ENGINE_TYPE || process.env.PRISMA_CLIENT_ENGINE_TYPE === "client") {
+  process.env.PRISMA_CLIENT_ENGINE_TYPE = "binary";
+}
+
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
