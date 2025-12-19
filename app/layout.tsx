@@ -24,8 +24,36 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+  if (!publishableKey) {
+    return (
+      <html lang="en">
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+        >
+          <div className="mx-auto flex min-h-screen max-w-4xl flex-col items-start gap-6 px-6 py-12">
+            <div className="rounded-lg border border-dashed border-amber-400/80 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-semibold">Clerk configuration required</p>
+              <p className="mt-2">Add your Clerk keys to .env.local to enable authentication and proxy protection:</p>
+              <ul className="mt-3 list-disc space-y-1 pl-5">
+                <li>Set NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY from your Clerk project.</li>
+                <li>Restart the dev server so Clerk loads the new credentials.</li>
+                <li>Optional: add DATABASE_URL/DIRECT_URL and Supabase keys so dashboard health checks pass.</li>
+              </ul>
+            </div>
+            <p className="text-base text-muted-foreground">
+              Once the keys are set, reload the page to resume the standard layout and Clerk-powered components.
+            </p>
+          </div>
+        </body>
+      </html>
+    );
+  }
+
   return (
     <ClerkProvider
+      publishableKey={publishableKey}
       appearance={{
         layout: {
           unsafe_disableDevelopmentModeWarnings: true,

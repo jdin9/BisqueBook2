@@ -36,7 +36,7 @@ npm run lint
 ```
 
 ## Authentication
-- `middleware.ts` protects `/dashboard` (and any nested routes) using Clerk.
+- `proxy.ts` protects `/dashboard` (and any nested routes) using Clerk.
 - Sign-in and sign-up routes are available at `/sign-in` and `/sign-up`.
 - Update redirect URLs in `.env.example` to match your deployment.
 
