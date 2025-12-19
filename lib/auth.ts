@@ -1,4 +1,4 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { clerkClient, currentUser } from "@clerk/nextjs/server";
 import type { StudioMember, UserProfile } from "@prisma/client";
 
 import { getPrismaClient } from "@/lib/prisma";
@@ -14,10 +14,16 @@ export type CurrentUserProfile = UserProfile & {
 } & DerivedProfile;
 
 export async function getCurrentUserProfile(userId?: string): Promise<CurrentUserProfile | null> {
-  const clerkUser = await currentUser();
-  const resolvedUserId = userId ?? clerkUser?.id;
+  const sessionUser = await currentUser();
+  const resolvedUserId = userId ?? sessionUser?.id;
 
   if (!resolvedUserId) return null;
+
+  const clerkUser =
+    sessionUser ||
+    (await clerkClient.users
+      .getUser(resolvedUserId)
+      .catch(() => null));
 
   const prisma = getPrismaClient();
   const profile = await prisma.userProfile.findUnique({
@@ -25,9 +31,25 @@ export async function getCurrentUserProfile(userId?: string): Promise<CurrentUse
     include: { studioMembers: true },
   });
 
-  if (!profile) return null;
+  const ensuredProfile =
+    profile ||
+    (clerkUser
+      ? await prisma.userProfile.create({
+          data: {
+            userId: resolvedUserId,
+            email: clerkUser.primaryEmailAddress?.emailAddress ?? null,
+            name:
+              clerkUser.fullName ||
+              [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
+              null,
+          },
+          include: { studioMembers: true },
+        })
+      : null);
 
-  const activeMemberships = profile.studioMembers.filter(
+  if (!ensuredProfile) return null;
+
+  const activeMemberships = ensuredProfile.studioMembers.filter(
     (member) => member.status === "active",
   );
 
@@ -42,7 +64,7 @@ export async function getCurrentUserProfile(userId?: string): Promise<CurrentUse
   const studioId = activeMemberships[0]?.studioId ?? null;
 
   return {
-    ...profile,
+    ...ensuredProfile,
     isAdmin: isAdmin || isMetadataAdmin,
     isMetadataAdmin,
     studioId,
