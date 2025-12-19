@@ -5,7 +5,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserProfile } from "@/lib/auth";
 import { getPrismaClient } from "@/lib/prisma";
 
-const prisma = getPrismaClient();
+function getPrisma() {
+  return getPrismaClient();
+}
 
 type RouteParams = {
   params: Promise<{ studioId: string; memberId: string }>;
@@ -62,6 +64,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       { status: 400 },
     );
   }
+
+  const prisma = getPrisma();
 
   const existingMember = await prisma.studioMember.findUnique({
     where: { id: memberId },

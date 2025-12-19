@@ -4,9 +4,13 @@ import { NextResponse } from "next/server";
 import { hashJoinPassword } from "@/lib/password";
 import { getPrismaClient } from "@/lib/prisma";
 
-const prisma = getPrismaClient();
+function getPrisma() {
+  return getPrismaClient();
+}
 
 async function ensureUserProfile(userId: string) {
+  const prisma = getPrisma();
+
   const existingProfile = await prisma.userProfile.findUnique({
     where: { userId },
   });
@@ -34,6 +38,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const prisma = getPrisma();
   const studios = await prisma.studio.findMany({
     include: {
       owner: true,
@@ -55,6 +60,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const prisma = getPrisma();
   const body = await request.json();
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const joinPassword = typeof body.joinPassword === "string" ? body.joinPassword.trim() : "";
