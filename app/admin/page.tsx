@@ -1,4 +1,6 @@
+import { StudioManagement } from "@/components/admin/studio-management";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getPrismaClient } from "@/lib/prisma";
 
 const tabContent = {
   studio: {
@@ -15,7 +17,19 @@ const tabContent = {
   },
 } as const;
 
-export default function AdminPage() {
+export default async function AdminPage() {
+  const prisma = getPrismaClient();
+  const studios = await prisma.studio.findMany({
+    include: {
+      members: {
+        include: { user: true },
+        orderBy: { createdAt: "asc" },
+      },
+      owner: true,
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
   return (
     <div className="space-y-6">
       <Tabs defaultValue="studio" className="w-full">
@@ -25,8 +39,9 @@ export default function AdminPage() {
           <TabsTrigger value="pottery">Pottery</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="studio">
+        <TabsContent value="studio" className="space-y-6">
           <Section {...tabContent.studio} />
+          <StudioManagement initialStudios={studios} />
         </TabsContent>
         <TabsContent value="kiln">
           <Section {...tabContent.kiln} />

@@ -26,10 +26,14 @@ export async function getCurrentUserProfile(userId?: string): Promise<CurrentUse
 
   if (!profile) return null;
 
-  const isAdmin = profile.studioMembers.some(
+  const activeMemberships = profile.studioMembers.filter(
+    (member) => member.status === "active",
+  );
+
+  const isAdmin = activeMemberships.some(
     (member) => member.role?.toLowerCase() === "admin",
   );
-  const studioId = profile.studioMembers[0]?.studioId ?? null;
+  const studioId = activeMemberships[0]?.studioId ?? null;
 
   return { ...profile, isAdmin, studioId };
 }
