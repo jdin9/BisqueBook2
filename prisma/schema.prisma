@@ -24,12 +24,15 @@ model UserProfile {
 }
 
 model Studio {
-  id          String         @id @default(cuid())
-  name        String
-  description String?
-  ownerId     String
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id                    String    @id @default(cuid())
+  name                  String
+  description           String?
+  ownerId               String
+  joinPasswordHash      String?
+  joinPasswordSalt      String?
+  joinPasswordUpdatedAt DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   owner    UserProfile    @relation("StudioOwner", fields: [ownerId], references: [id])
   members  StudioMember[]
@@ -40,93 +43,100 @@ model Studio {
 }
 
 model StudioMember {
-  id        String      @id @default(cuid())
+  id        String                 @id @default(cuid())
   studioId  String
   userId    String
   role      String?
-  createdAt DateTime    @default(now())
+  status    StudioMembershipStatus @default(pending)
+  createdAt DateTime               @default(now())
 
-  studio Studio     @relation(fields: [studioId], references: [id])
+  studio Studio      @relation(fields: [studioId], references: [id])
   user   UserProfile @relation(fields: [userId], references: [id])
 
   @@unique([studioId, userId])
 }
 
+enum StudioMembershipStatus {
+  pending
+  active
+  revoked
+}
+
 model Kiln {
-  id             String    @id @default(cuid())
+  id             String   @id @default(cuid())
   studioId       String
   name           String
   type           String?
   maxTemperature Int?
   atmosphere     String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   studio  Studio   @relation(fields: [studioId], references: [id])
   firings Firing[]
 }
 
 model Clay {
-  id          String    @id @default(cuid())
-  studioId    String
-  name        String
+  id           String   @id @default(cuid())
+  studioId     String
+  name         String
   manufacturer String?
-  cone        String?
-  notes       String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  cone         String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  studio  Studio    @relation(fields: [studioId], references: [id])
+  studio   Studio    @relation(fields: [studioId], references: [id])
   projects Project[]
 }
 
 model Glaze {
-  id          String    @id @default(cuid())
-  studioId    String
-  name        String
+  id           String   @id @default(cuid())
+  studioId     String
+  name         String
   manufacturer String?
-  color       String?
-  cone        String?
-  notes       String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  color        String?
+  cone         String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  studio  Studio    @relation(fields: [studioId], references: [id])
+  studio   Studio    @relation(fields: [studioId], references: [id])
   projects Project[]
 }
 
 model Project {
-  id          String     @id @default(cuid())
+  id          String   @id @default(cuid())
   studioId    String
   name        String
   description String?
   clayId      String?
   glazeId     String?
   createdById String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  studio    Studio      @relation(fields: [studioId], references: [id])
-  clay      Clay?       @relation(fields: [clayId], references: [id])
-  glaze     Glaze?      @relation(fields: [glazeId], references: [id])
+  studio    Studio       @relation(fields: [studioId], references: [id])
+  clay      Clay?        @relation(fields: [clayId], references: [id])
+  glaze     Glaze?       @relation(fields: [glazeId], references: [id])
   createdBy UserProfile? @relation("ProjectCreator", fields: [createdById], references: [id])
   firings   Firing[]
 }
 
 model Firing {
-  id         String     @id @default(cuid())
-  projectId  String
-  kilnId     String
-  firedById  String?
-  type       String?
-  cone       String?
-  startTime  DateTime?
-  endTime    DateTime?
-  notes      String?
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  id        String    @id @default(cuid())
+  projectId String
+  kilnId    String
+  firedById String?
+  type      String?
+  cone      String?
+  startTime DateTime?
+  endTime   DateTime?
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  project  Project     @relation(fields: [projectId], references: [id])
-  kiln     Kiln        @relation(fields: [kilnId], references: [id])
-  firedBy  UserProfile? @relation("FiringOperator", fields: [firedById], references: [id])
+  project Project      @relation(fields: [projectId], references: [id])
+  kiln    Kiln         @relation(fields: [kilnId], references: [id])
+  firedBy UserProfile? @relation("FiringOperator", fields: [firedById], references: [id])
 }
