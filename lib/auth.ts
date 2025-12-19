@@ -5,8 +5,6 @@ import { getPrismaClient } from "@/lib/prisma";
 
 type DerivedProfile = {
   studioId: string | null;
-  isAdmin: boolean;
-  isMetadataAdmin: boolean;
 };
 
 export type CurrentUserProfile = UserProfile & {
@@ -54,18 +52,10 @@ export async function getCurrentUserProfile(userId?: string): Promise<CurrentUse
     (member) => member.status === "active",
   );
 
-  const isMetadataAdmin = Boolean(
-    clerkUser?.unsafeMetadata?.isAdmin ?? clerkUser?.publicMetadata?.isAdmin,
-  );
-
-  const isAdmin = true;
-
   const studioId = activeMemberships[0]?.studioId ?? null;
 
   return {
     ...ensuredProfile,
-    isAdmin: isAdmin || isMetadataAdmin,
-    isMetadataAdmin,
     studioId,
   };
 }
