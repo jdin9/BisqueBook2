@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { generateJoinPassword, hashJoinPassword } from "@/lib/password";
 import { getPrismaClient } from "@/lib/prisma";
@@ -7,10 +7,11 @@ import { getPrismaClient } from "@/lib/prisma";
 const prisma = getPrismaClient();
 
 type RouteParams = {
-  params: { studioId: string };
+  params: Promise<{ studioId: string }>;
 };
 
-export async function POST(_: Request, { params }: RouteParams) {
+export async function POST(_: NextRequest, { params }: RouteParams) {
+  const { studioId } = await params;
   const { userId } = auth();
 
   if (!userId) {
@@ -19,7 +20,7 @@ export async function POST(_: Request, { params }: RouteParams) {
 
   const membership = await prisma.studioMember.findFirst({
     where: {
-      studioId: params.studioId,
+      studioId,
       user: { userId },
       role: { equals: "admin", mode: "insensitive" },
       status: "active",
@@ -30,7 +31,7 @@ export async function POST(_: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "Admin access required." }, { status: 403 });
   }
 
-  const studio = await prisma.studio.findUnique({ where: { id: params.studioId } });
+  const studio = await prisma.studio.findUnique({ where: { id: studioId } });
 
   if (!studio) {
     return NextResponse.json({ error: "Studio not found." }, { status: 404 });
@@ -40,7 +41,7 @@ export async function POST(_: Request, { params }: RouteParams) {
   const { hash, salt, updatedAt } = hashJoinPassword(password);
 
   const updatedStudio = await prisma.studio.update({
-    where: { id: params.studioId },
+    where: { id: studioId },
     data: {
       joinPasswordHash: hash,
       joinPasswordSalt: salt,

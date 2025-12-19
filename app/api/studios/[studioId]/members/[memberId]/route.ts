@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentUserProfile } from "@/lib/auth";
 import { getPrismaClient } from "@/lib/prisma";
@@ -7,10 +7,11 @@ import { getPrismaClient } from "@/lib/prisma";
 const prisma = getPrismaClient();
 
 type RouteParams = {
-  params: { studioId: string; memberId: string };
+  params: Promise<{ studioId: string; memberId: string }>;
 };
 
-export async function PATCH(request: Request, { params }: RouteParams) {
+export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  const { studioId, memberId } = await params;
   const { userId } = auth();
 
   if (!userId) {
@@ -25,7 +26,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
   const activeMembership = profile.studioMembers.find(
     (membership) =>
-      membership.studioId === params.studioId &&
+      membership.studioId === studioId &&
       membership.status === "active" &&
       membership.role?.toLowerCase() === "admin",
   );
@@ -45,15 +46,15 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   }
 
   const existingMember = await prisma.studioMember.findUnique({
-    where: { id: params.memberId },
+    where: { id: memberId },
   });
 
-  if (!existingMember || existingMember.studioId !== params.studioId) {
+  if (!existingMember || existingMember.studioId !== studioId) {
     return NextResponse.json({ error: "Member not found." }, { status: 404 });
   }
 
   const updatedMember = await prisma.studioMember.update({
-    where: { id: params.memberId },
+    where: { id: memberId },
     data: { status: action === "approve" ? "active" : "revoked" },
     include: { user: true },
   });
