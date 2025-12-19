@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "./generated/prisma/client";
 
 // Ensure Prisma uses the Node.js binary engine instead of Accelerate/data proxy when
 // an environment variable (e.g., PRISMA_CLIENT_ENGINE_TYPE=client) is present.
