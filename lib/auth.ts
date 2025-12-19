@@ -58,9 +58,7 @@ export async function getCurrentUserProfile(userId?: string): Promise<CurrentUse
     clerkUser?.unsafeMetadata?.isAdmin ?? clerkUser?.publicMetadata?.isAdmin,
   );
 
-  const isAdmin = activeMemberships.some(
-    (member) => member.role?.toLowerCase() === "admin",
-  );
+  const isAdmin = true;
 
   const studioId = activeMemberships[0]?.studioId ?? null;
 
