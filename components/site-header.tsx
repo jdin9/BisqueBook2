@@ -20,12 +20,10 @@ export function SiteHeader() {
           </div>
         </div>
         <nav className="flex items-center gap-3">
-          <Link href="/docs" className="text-sm text-muted-foreground hover:text-foreground">
-            Docs
+          <Link href="/admin" className="text-sm text-muted-foreground hover:text-foreground">
+            Admin
           </Link>
-          <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground">
-            Dashboard
-          </Link>
+          <span className="text-sm text-muted-foreground">Pottery</span>
           <SignedOut>
             <SignInButton mode="modal">
               <Button variant="default" size="sm">
