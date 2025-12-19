@@ -25,9 +25,25 @@ export async function getCurrentUserProfile(userId?: string): Promise<CurrentUse
     include: { studioMembers: true },
   });
 
-  if (!profile) return null;
+  const ensuredProfile =
+    profile ||
+    (clerkUser
+      ? await prisma.userProfile.create({
+          data: {
+            userId: resolvedUserId,
+            email: clerkUser.primaryEmailAddress?.emailAddress ?? null,
+            name:
+              clerkUser.fullName ||
+              [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
+              null,
+          },
+          include: { studioMembers: true },
+        })
+      : null);
 
-  const activeMemberships = profile.studioMembers.filter(
+  if (!ensuredProfile) return null;
+
+  const activeMemberships = ensuredProfile.studioMembers.filter(
     (member) => member.status === "active",
   );
 
@@ -42,7 +58,7 @@ export async function getCurrentUserProfile(userId?: string): Promise<CurrentUse
   const studioId = activeMemberships[0]?.studioId ?? null;
 
   return {
-    ...profile,
+    ...ensuredProfile,
     isAdmin: isAdmin || isMetadataAdmin,
     isMetadataAdmin,
     studioId,
