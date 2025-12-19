@@ -18,6 +18,29 @@ const features = [
   },
 ];
 
+const pages = [
+  {
+    title: "Dashboard",
+    description: "View protected app routes that are ready for your product dashboards.",
+    href: "/dashboard",
+  },
+  {
+    title: "Admin portal",
+    description: "Create new studios, manage members, and organize inventory tools.",
+    href: "/admin",
+  },
+  {
+    title: "Documentation",
+    description: "Review local setup steps, environment variables, and deployment notes.",
+    href: "/docs",
+  },
+  {
+    title: "Sign in",
+    description: "Jump to the authentication flow to access protected areas.",
+    href: "/sign-in",
+  },
+];
+
 export default function Home() {
   return (
     <div className="space-y-10">
@@ -87,6 +110,30 @@ export default function Home() {
             </CardContent>
           </Card>
         ))}
+      </section>
+
+      <section className="space-y-3">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold leading-tight">Explore every page</h2>
+          <p className="text-sm text-muted-foreground">
+            Quick links to the core destinations of the app, including studio creation and admin tools.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {pages.map((page) => (
+            <Card key={page.title} className="h-full">
+              <CardHeader>
+                <CardTitle>{page.title}</CardTitle>
+                <CardDescription>{page.description}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="ghost" asChild>
+                  <Link href={page.href}>Visit {page.title.toLowerCase()}</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </section>
     </div>
   );
