@@ -19,9 +19,10 @@ export async function getCurrentUserProfile(userId?: string): Promise<CurrentUse
 
   if (!resolvedUserId) return null;
 
+  const clerk = await clerkClient();
   const clerkUser =
     sessionUser ||
-    (await clerkClient.users
+    (await clerk.users
       .getUser(resolvedUserId)
       .catch(() => null));
 
