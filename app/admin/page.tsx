@@ -24,12 +24,19 @@ export default function AdminPage() {
         <TabsContent value="studio" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Studio schedule</CardTitle>
-              <CardDescription>Outline work sessions, classes, and team access.</CardDescription>
+              <CardTitle>Studio access</CardTitle>
+              <CardDescription>Define shared details for sign-ins around the studio.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm text-muted-foreground">
-              <p>Keep track of who&apos;s on the wheel, when glazes are mixed, and what tools are in use.</p>
-              <p>Use this tab to align your studio calendar with kiln firings and pottery deadlines.</p>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="studio-name">Studio Name</Label>
+                <Input id="studio-name" placeholder="Enter studio name" />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="studio-password">Studio Password</Label>
+                <Input id="studio-password" type="password" placeholder="Enter studio password" />
+              </div>
             </CardContent>
           </Card>
 
