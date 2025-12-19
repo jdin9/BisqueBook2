@@ -21,7 +21,7 @@ export function AccountAccessSection() {
   const metadata = useMemo<Record<string, unknown>>(() => {
     if (!user) return {}
 
-    const data = user.publicMetadata || {}
+    const data = user.unsafeMetadata || {}
     return typeof data === "object" && data !== null ? data : {}
   }, [user])
 
@@ -38,11 +38,11 @@ export function AccountAccessSection() {
     const nextValue = !isAdmin
 
     setSaving(true)
-    setError(null)
+      setError(null)
 
     try {
       await user.update({
-        publicMetadata: {
+        unsafeMetadata: {
           ...metadata,
           isAdmin: nextValue,
         },

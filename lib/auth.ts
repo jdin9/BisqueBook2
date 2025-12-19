@@ -31,7 +31,9 @@ export async function getCurrentUserProfile(userId?: string): Promise<CurrentUse
     (member) => member.status === "active",
   );
 
-  const isMetadataAdmin = Boolean(clerkUser?.publicMetadata?.isAdmin);
+  const isMetadataAdmin = Boolean(
+    clerkUser?.unsafeMetadata?.isAdmin ?? clerkUser?.publicMetadata?.isAdmin,
+  );
 
   const isAdmin = activeMemberships.some(
     (member) => member.role?.toLowerCase() === "admin",
