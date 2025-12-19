@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 const features = [
   {
     title: "Multi-user auth",
-    description: "Clerk middleware protects dashboard routes while keeping marketing pages public.",
+    description: "Clerk proxy protects dashboard routes while keeping marketing pages public.",
   },
   {
     title: "Database ready",
@@ -68,7 +68,7 @@ export default function Home() {
               <li>Create a Supabase Storage bucket and set the bucket name.</li>
               <li>Run `npm run prisma:migrate:create` locally to keep SQL in sync.</li>
             </ul>
-            <p className="text-xs text-muted-foreground">Middleware already protects /dashboard and future app routes.</p>
+            <p className="text-xs text-muted-foreground">Proxy already protects /dashboard and future app routes.</p>
           </CardContent>
         </Card>
       </section>
