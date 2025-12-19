@@ -12,7 +12,7 @@ type RouteParams = {
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const { studioId, memberId } = await params;
-  const { userId } = auth();
+  const { userId } = await auth();
 
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
