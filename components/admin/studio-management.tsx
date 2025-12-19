@@ -15,6 +15,11 @@ type StudioWithMembers = Studio & { members: StudioMemberWithUser[] };
 
 type MemberAction = "approve" | "revoke";
 
+const ROLE_OPTIONS = [
+  { value: "member", label: "Member" },
+  { value: "admin", label: "Admin" },
+];
+
 type StudioManagementProps = {
   initialStudios: StudioWithMembers[];
 };
@@ -114,6 +119,46 @@ export function StudioManagement({ initialStudios }: StudioManagementProps) {
         ? "Member approved."
         : "Member access revoked.",
     );
+    setUpdatingMemberId(null);
+  };
+
+  const handleRoleUpdate = async (memberId: string, role: string) => {
+    if (!selectedStudio) return;
+
+    setUpdatingMemberId(memberId);
+    setStatusMessage(null);
+
+    const response = await fetch(
+      `/api/studios/${selectedStudio.id}/members/${memberId}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      },
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      setStatusMessage(result.error || "Unable to update role.");
+      setUpdatingMemberId(null);
+      return;
+    }
+
+    setStudios((prev) =>
+      prev.map((studio) =>
+        studio.id === selectedStudio.id
+          ? {
+              ...studio,
+              members: studio.members.map((member) =>
+                member.id === memberId ? result.member : member,
+              ),
+            }
+          : studio,
+      ),
+    );
+
+    setStatusMessage("Role updated.");
     setUpdatingMemberId(null);
   };
 
@@ -293,7 +338,27 @@ export function StudioManagement({ initialStudios }: StudioManagementProps) {
                       {member.role ? ` • Role: ${member.role}` : ""}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs" htmlFor={`role-${member.id}`}>
+                        Role
+                      </Label>
+                      <select
+                        className={cn(
+                          "flex h-9 w-32 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                        )}
+                        disabled={updatingMemberId === member.id}
+                        id={`role-${member.id}`}
+                        onChange={(event) => handleRoleUpdate(member.id, event.target.value)}
+                        value={member.role?.toLowerCase() || "member"}
+                      >
+                        {ROLE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <Button
                       disabled={member.status === "active" || updatingMemberId === member.id}
                       onClick={() => handleMemberAction(member.id, "approve")}
