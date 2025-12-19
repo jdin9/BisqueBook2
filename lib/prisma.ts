@@ -14,19 +14,30 @@ const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
-    // Force the Node.js binary engine to avoid requiring Accelerate/adapter config in local and server builds.
-    engineType: "binary",
-  });
+function getPrismaClient() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is missing. Add it to .env.local to enable database access.");
+  }
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = new PrismaClient({
+      log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+      // Force the Node.js binary engine to avoid requiring Accelerate/adapter config in local and server builds.
+      engineType: "binary",
+    });
+  }
+
+  return globalForPrisma.prisma;
 }
 
 export async function ensureDatabaseConnection() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is missing. Add it to .env.local to enable database access.");
+  }
+
   // Lightweight connectivity check to verify the connection string works in local dev.
-  await prisma.$queryRaw`SELECT 1`;
+  const client = getPrismaClient();
+  await client.$queryRaw`SELECT 1`;
 }
+
+export { getPrismaClient };
