@@ -1,14 +1,6 @@
 "use client"
 
-import {
-  RedirectToSignIn,
-  SignedIn,
-  SignedOut,
-  UserProfile,
-} from "@clerk/nextjs"
-import { ShieldCheck } from "lucide-react"
-
-import { AccountAccessSection } from "@/components/account/account-access-section"
+import { RedirectToSignIn, SignedIn, SignedOut, UserProfile } from "@clerk/nextjs"
 
 export default function AccountPage() {
   return (
@@ -22,17 +14,7 @@ export default function AccountPage() {
               navbar: "lg:w-64",
             },
           }}
-        >
-          <UserProfile.Page
-            label="Account access"
-            url="account-access"
-            labelIcon={<ShieldCheck className="h-4 w-4" />}
-          >
-            <div className="py-4">
-              <AccountAccessSection />
-            </div>
-          </UserProfile.Page>
-        </UserProfile>
+        />
       </SignedIn>
       <SignedOut>
         <RedirectToSignIn />

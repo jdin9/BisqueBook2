@@ -25,11 +25,6 @@ const pages = [
     href: "/dashboard",
   },
   {
-    title: "Admin portal",
-    description: "Create new studios, manage members, and organize inventory tools.",
-    href: "/admin",
-  },
-  {
     title: "Documentation",
     description: "Review local setup steps, environment variables, and deployment notes.",
     href: "/docs",
@@ -116,7 +111,7 @@ export default function Home() {
         <div className="space-y-2">
           <h2 className="text-2xl font-semibold leading-tight">Explore every page</h2>
           <p className="text-sm text-muted-foreground">
-            Quick links to the core destinations of the app, including studio creation and admin tools.
+            Quick links to the core destinations of the app, from the dashboard to the docs.
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
