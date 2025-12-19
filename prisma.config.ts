@@ -8,7 +8,6 @@ const DEFAULT_DATABASE_URL =
   "postgresql://postgres:postgres@localhost:5432/postgres?schema=public";
 
 const databaseUrl = process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL;
-const directUrl = process.env.DIRECT_URL ?? databaseUrl;
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -17,6 +16,5 @@ export default defineConfig({
   },
   datasource: {
     url: databaseUrl,
-    directUrl,
   },
 });
