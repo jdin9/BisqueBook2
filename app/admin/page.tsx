@@ -2,6 +2,8 @@ import { StudioManagement } from "@/components/admin/studio-management";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getPrismaClient } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 const tabContent = {
   studio: {
     title: "Studios",
