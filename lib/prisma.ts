@@ -1,4 +1,6 @@
 import { PrismaClient } from "./generated/prisma/client";
+import { Pool } from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 // Ensure Prisma uses the Node.js binary engine instead of Accelerate/data proxy when
 // an environment variable (e.g., PRISMA_CLIENT_ENGINE_TYPE=client) is present.
@@ -22,8 +24,8 @@ function getPrismaClient() {
   if (!globalForPrisma.prisma) {
     globalForPrisma.prisma = new PrismaClient({
       log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+      adapter: new PrismaPg(new Pool({ connectionString: (process.env.DATABASE_URL || "").replace("sslmode=require",""), ssl: { rejectUnauthorized: false } })),
       // Force the Node.js binary engine to avoid requiring Accelerate/adapter config in local and server builds.
-      engineType: "binary",
     });
   }
 
