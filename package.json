@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "postinstall": "prisma generate --schema prisma/schema.prisma",
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "prisma:migrate:create": "DATABASE_URL=${DATABASE_URL:-postgresql://user:pass@localhost:5432/db} DIRECT_URL=${DIRECT_URL:-$DATABASE_URL} prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script > prisma/migrations/20241024000000_init/migration.sql",
     "prisma:migrate:deploy": "prisma migrate deploy",
