@@ -1,6 +1,6 @@
 import { StudioManagement } from "@/components/admin/studio-management";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getPrismaClient } from "@/lib/prisma";
+import { getPrismaClient, isDatabaseConfigured } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +20,18 @@ const tabContent = {
 } as const;
 
 export default async function AdminPage() {
+  if (!isDatabaseConfigured()) {
+    return (
+      <div className="space-y-3 rounded-md border border-dashed bg-muted/40 p-6 text-sm text-muted-foreground">
+        <p className="font-medium text-foreground">Database configuration required</p>
+        <p>
+          Set a <code>DATABASE_URL</code> value in <code>.env.local</code> to load and manage studios from the admin
+          dashboard.
+        </p>
+      </div>
+    );
+  }
+
   const prisma = getPrismaClient();
   const studios = await prisma.studio.findMany({
     include: {
