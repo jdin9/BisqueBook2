@@ -6,6 +6,7 @@ import {
   SignedOut,
   UserProfile,
 } from "@clerk/nextjs"
+import { ShieldCheck } from "lucide-react"
 
 import { AccountAccessSection } from "@/components/account/account-access-section"
 
@@ -22,7 +23,11 @@ export default function AccountPage() {
             },
           }}
         >
-          <UserProfile.Page label="Account access" url="account-access">
+          <UserProfile.Page
+            label="Account access"
+            url="account-access"
+            labelIcon={<ShieldCheck className="h-4 w-4" />}
+          >
             <div className="py-4">
               <AccountAccessSection />
             </div>
