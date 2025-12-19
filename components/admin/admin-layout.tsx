@@ -26,6 +26,8 @@ export function AdminLayout({
               userButtonAvatarBox: "h-12 w-12",
             },
           }}
+          userProfileMode="navigation"
+          userProfileUrl="/account"
           showName
         />
       </header>

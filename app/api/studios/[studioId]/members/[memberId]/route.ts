@@ -32,7 +32,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       membership.role?.toLowerCase() === "admin",
   );
 
-  if (!activeMembership) {
+  const hasAdminRights = profile.isMetadataAdmin || Boolean(activeMembership);
+
+  if (!hasAdminRights) {
     return NextResponse.json({ error: "You cannot manage this studio." }, { status: 403 });
   }
 
