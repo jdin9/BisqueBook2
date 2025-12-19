@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import { StudioMembershipStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentUserProfile } from "@/lib/auth";
@@ -37,10 +38,25 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
   const body = await request.json();
   const action = typeof body.action === "string" ? body.action : "";
+  const role = typeof body.role === "string" ? body.role.trim().toLowerCase() : "";
 
-  if (!action || !["approve", "revoke"].includes(action)) {
+  if (!action && !role) {
+    return NextResponse.json(
+      { error: "Provide an action of 'approve' or 'revoke', or a valid role." },
+      { status: 400 },
+    );
+  }
+
+  if (action && !["approve", "revoke"].includes(action)) {
     return NextResponse.json(
       { error: "Action must be 'approve' or 'revoke'." },
+      { status: 400 },
+    );
+  }
+
+  if (role && !["admin", "member"].includes(role)) {
+    return NextResponse.json(
+      { error: "Role must be 'member' or 'admin'." },
       { status: 400 },
     );
   }
@@ -53,9 +69,19 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Member not found." }, { status: 404 });
   }
 
+  const updateData: Partial<{ status: StudioMembershipStatus; role: string }> = {};
+
+  if (action) {
+    updateData.status = action === "approve" ? "active" : "revoked";
+  }
+
+  if (role) {
+    updateData.role = role;
+  }
+
   const updatedMember = await prisma.studioMember.update({
     where: { id: memberId },
-    data: { status: action === "approve" ? "active" : "revoked" },
+    data: updateData,
     include: { user: true },
   });
 
