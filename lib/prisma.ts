@@ -1,45 +1,53 @@
-import { PrismaClient } from "@prisma/client";
-import { Pool } from "pg";
-import { PrismaPg } from "@prisma/adapter-pg";
-
-// Ensure Prisma uses the Node.js binary engine instead of Accelerate/data proxy when
-// an environment variable (e.g., PRISMA_CLIENT_ENGINE_TYPE=client) is present.
-process.env.PRISMA_CLIENT_ENGINE_TYPE ??= "binary";
-
-// Force Prisma to use the Node.js binary engine during local/server execution.
-// The "client" engine type requires Accelerate or an adapter, which isn't configured here.
-if (!process.env.PRISMA_CLIENT_ENGINE_TYPE || process.env.PRISMA_CLIENT_ENGINE_TYPE === "client") {
-  process.env.PRISMA_CLIENT_ENGINE_TYPE = "binary";
-}
+import { PrismaClient } from "@prisma/client"
+import { Pool } from "pg"
+import { PrismaPg } from "@prisma/adapter-pg"
 
 const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient;
-};
+  prisma?: PrismaClient
+}
+
+function buildPool() {
+  const connectionString = process.env.DATABASE_URL
+
+  if (!connectionString) {
+    throw new Error("DATABASE_URL is missing. Add it to .env.local to enable database access.")
+  }
+
+  const url = new URL(connectionString)
+  const sslmode = url.searchParams.get("sslmode")
+
+  if (sslmode === "require") {
+    url.searchParams.delete("sslmode")
+  }
+
+  return new Pool({
+    connectionString: url.toString(),
+    ssl: sslmode === "require" ? { rejectUnauthorized: false } : undefined,
+  })
+}
 
 function getPrismaClient() {
   if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is missing. Add it to .env.local to enable database access.");
+    throw new Error("DATABASE_URL is missing. Add it to .env.local to enable database access.")
   }
 
   if (!globalForPrisma.prisma) {
     globalForPrisma.prisma = new PrismaClient({
       log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
-      adapter: new PrismaPg(new Pool({ connectionString: (process.env.DATABASE_URL || "").replace("sslmode=require",""), ssl: { rejectUnauthorized: false } })),
-      // Force the Node.js binary engine to avoid requiring Accelerate/adapter config in local and server builds.
-    });
+      adapter: new PrismaPg(buildPool()),
+    })
   }
 
-  return globalForPrisma.prisma;
+  return globalForPrisma.prisma
 }
 
 export async function ensureDatabaseConnection() {
   if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is missing. Add it to .env.local to enable database access.");
+    throw new Error("DATABASE_URL is missing. Add it to .env.local to enable database access.")
   }
 
-  // Lightweight connectivity check to verify the connection string works in local dev.
-  const client = getPrismaClient();
-  await client.$queryRaw`SELECT 1`;
+  const client = getPrismaClient()
+  await client.$queryRaw`SELECT 1`
 }
 
-export { getPrismaClient };
+export { getPrismaClient }

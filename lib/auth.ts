@@ -6,6 +6,7 @@ import { getPrismaClient } from "@/lib/prisma";
 type DerivedProfile = {
   studioId: string | null;
   isAdmin: boolean;
+  isMetadataAdmin: boolean;
 };
 
 export type CurrentUserProfile = UserProfile & {
@@ -13,8 +14,8 @@ export type CurrentUserProfile = UserProfile & {
 } & DerivedProfile;
 
 export async function getCurrentUserProfile(userId?: string): Promise<CurrentUserProfile | null> {
-  const user = userId ? { id: userId } : await currentUser();
-  const resolvedUserId = userId ?? user?.id;
+  const clerkUser = await currentUser();
+  const resolvedUserId = userId ?? clerkUser?.id;
 
   if (!resolvedUserId) return null;
 
@@ -30,10 +31,20 @@ export async function getCurrentUserProfile(userId?: string): Promise<CurrentUse
     (member) => member.status === "active",
   );
 
+  const isMetadataAdmin = Boolean(
+    clerkUser?.unsafeMetadata?.isAdmin ?? clerkUser?.publicMetadata?.isAdmin,
+  );
+
   const isAdmin = activeMemberships.some(
     (member) => member.role?.toLowerCase() === "admin",
   );
+
   const studioId = activeMemberships[0]?.studioId ?? null;
 
-  return { ...profile, isAdmin, studioId };
+  return {
+    ...profile,
+    isAdmin: isAdmin || isMetadataAdmin,
+    isMetadataAdmin,
+    studioId,
+  };
 }

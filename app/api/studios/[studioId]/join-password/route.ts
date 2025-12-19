@@ -4,7 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateJoinPassword, hashJoinPassword } from "@/lib/password";
 import { getPrismaClient } from "@/lib/prisma";
 
-const prisma = getPrismaClient();
+function getPrisma() {
+  return getPrismaClient();
+}
 
 type RouteParams = {
   params: Promise<{ studioId: string }>;
@@ -18,6 +20,7 @@ export async function POST(_: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const prisma = getPrisma();
   const membership = await prisma.studioMember.findFirst({
     where: {
       studioId,

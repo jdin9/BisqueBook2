@@ -40,6 +40,8 @@ export function SiteHeader() {
                   userButtonAvatarBox: "h-9 w-9",
                 },
               }}
+              userProfileMode="navigation"
+              userProfileUrl="/account"
               showName
             />
           </SignedIn>
