@@ -1,4 +1,4 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { clerkClient, currentUser } from "@clerk/nextjs/server";
 import type { StudioMember, UserProfile } from "@prisma/client";
 
 import { getPrismaClient } from "@/lib/prisma";
@@ -14,10 +14,17 @@ export type CurrentUserProfile = UserProfile & {
 } & DerivedProfile;
 
 export async function getCurrentUserProfile(userId?: string): Promise<CurrentUserProfile | null> {
-  const clerkUser = await currentUser();
-  const resolvedUserId = userId ?? clerkUser?.id;
+  const sessionUser = await currentUser();
+  const resolvedUserId = userId ?? sessionUser?.id;
 
   if (!resolvedUserId) return null;
+
+  const clerk = await clerkClient();
+  const clerkUser =
+    sessionUser ||
+    (await clerk.users
+      .getUser(resolvedUserId)
+      .catch(() => null));
 
   const prisma = getPrismaClient();
   const profile = await prisma.userProfile.findUnique({
