@@ -18,19 +18,28 @@ export function AccountAccessSection() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const metadata = useMemo<Record<string, unknown>>(() => {
+  const unsafeMetadata = useMemo<Record<string, unknown>>(() => {
     if (!user) return {}
 
     const data = user.unsafeMetadata || {}
     return typeof data === "object" && data !== null ? data : {}
   }, [user])
 
+  const publicMetadata = useMemo<Record<string, unknown>>(() => {
+    if (!user) return {}
+
+    const data = user.publicMetadata || {}
+    return typeof data === "object" && data !== null ? data : {}
+  }, [user])
+
   useEffect(() => {
     if (isLoaded && user) {
-      const adminFlag = metadata.isAdmin
+      const adminFlag =
+        unsafeMetadata.isAdmin ?? publicMetadata.isAdmin
+
       setIsAdmin(adminFlag === true)
     }
-  }, [isLoaded, user, metadata])
+  }, [isLoaded, user, unsafeMetadata, publicMetadata])
 
   const handleToggle = async () => {
     if (!user) return
@@ -43,7 +52,12 @@ export function AccountAccessSection() {
     try {
       await user.update({
         unsafeMetadata: {
-          ...metadata,
+          ...unsafeMetadata,
+          isAdmin: nextValue,
+        },
+        // @ts-expect-error Clerk's type helper omits publicMetadata even though the API supports it.
+        publicMetadata: {
+          ...publicMetadata,
           isAdmin: nextValue,
         },
       })
