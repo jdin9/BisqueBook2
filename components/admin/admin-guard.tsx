@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
-import { AccessDenied } from "@/components/access-denied";
 import { getCurrentUserProfile } from "@/lib/auth";
 
 export async function AdminGuard({ children }: { children: ReactNode }) {
@@ -14,14 +13,9 @@ export async function AdminGuard({ children }: { children: ReactNode }) {
 
   const profile = await getCurrentUserProfile(user.id);
 
-  if (!profile?.isAdmin) {
-    return (
-      <AccessDenied
-        description="Ask an administrator to grant you access."
-        title="Admin access required"
-      />
-    );
-  }
-
-  return <>{children}</>;
+  // All authenticated users should have access to the admin area. The profile
+  // lookup is still performed so that we create or hydrate the user's profile
+  // record, but we intentionally allow access even if the stored flag says
+  // otherwise.
+  return profile ? <>{children}</> : null;
 }
