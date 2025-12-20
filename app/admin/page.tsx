@@ -437,7 +437,7 @@ export default function AdminPage() {
                   </div>
                 ) : (
                   <div className="rounded-lg border p-4 text-sm text-muted-foreground">
-                    Digital kilns don&apos;t need extra input—log schedules elsewhere and keep this card for quick reference.
+                    Digital kilns don’t need extra input—log schedules elsewhere and keep this card for quick reference.
                   </div>
                 )}
 
