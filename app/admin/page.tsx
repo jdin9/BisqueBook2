@@ -15,16 +15,36 @@ type KilnType = "digital" | "manual";
 type ManualControl = "switches" | "dials";
 
 export default function AdminPage() {
+  const [kilnName, setKilnName] = useState("");
   const [kilnType, setKilnType] = useState<KilnType>("digital");
   const [manualControl, setManualControl] = useState<ManualControl>("switches");
   const [switchCount, setSwitchCount] = useState("1");
   const [dialCount, setDialCount] = useState("1");
   const [dialSettings, setDialSettings] = useState<string[]>(["Low"]);
   const [newDialSetting, setNewDialSetting] = useState("");
+  const [kilns, setKilns] = useState<
+    {
+      name: string;
+      type: KilnType;
+      manualControl?: ManualControl;
+      switchCount?: string;
+      dialCount?: string;
+      dialSettings?: string[];
+    }[]
+  >([]);
 
   const showManualDetails = kilnType === "manual";
   const showSwitches = showManualDetails && manualControl === "switches";
   const showDials = showManualDetails && manualControl === "dials";
+
+  const handleManualControlChange = (value: ManualControl) => {
+    setManualControl(value);
+
+    if (value === "dials") {
+      setDialSettings(["Low"]);
+      setNewDialSetting("");
+    }
+  };
 
   const dialSettingPlaceholder = useMemo(() => {
     return dialSettings.length ? `Example: ${dialSettings.join(", ")}` : "Example: Low, 2, 3, Med, 5, 6, High, Off";
@@ -41,6 +61,27 @@ export default function AdminPage() {
     if (!trimmed) return;
     setDialSettings((current) => [...current, trimmed]);
     setNewDialSetting("");
+  };
+
+  const handleAddKiln = () => {
+    const trimmedName = kilnName.trim();
+    if (!trimmedName) return;
+
+    const sanitizedDialSettings = dialSettings.map((setting) => setting.trim()).filter(Boolean);
+
+    setKilns((current) => [
+      ...current,
+      {
+        name: trimmedName,
+        type: kilnType,
+        manualControl: kilnType === "manual" ? manualControl : undefined,
+        switchCount: kilnType === "manual" && manualControl === "switches" ? switchCount : undefined,
+        dialCount: kilnType === "manual" && manualControl === "dials" ? dialCount : undefined,
+        dialSettings: kilnType === "manual" && manualControl === "dials" ? sanitizedDialSettings : undefined,
+      },
+    ]);
+
+    setKilnName("");
   };
 
   return (
@@ -95,7 +136,12 @@ export default function AdminPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="kiln-name">Kiln Name</Label>
-                  <Input id="kiln-name" placeholder="Studio kiln label (e.g., Skutt 1027)" />
+                  <Input
+                    id="kiln-name"
+                    value={kilnName}
+                    onChange={(event) => setKilnName(event.target.value)}
+                    placeholder="Studio kiln label (e.g., Skutt 1027)"
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -120,11 +166,11 @@ export default function AdminPage() {
                       Choose whether the kiln uses switches or dial markings so you can record the right counts and ranges.
                     </p>
                     <select
-                      id="manual-control"
-                      className={selectClassName}
-                      value={manualControl}
-                      onChange={(event) => setManualControl(event.target.value as ManualControl)}
-                    >
+                    id="manual-control"
+                    className={selectClassName}
+                    value={manualControl}
+                    onChange={(event) => handleManualControlChange(event.target.value as ManualControl)}
+                  >
                       <option value="switches">Switches</option>
                       <option value="dials">Dials</option>
                     </select>
@@ -196,6 +242,56 @@ export default function AdminPage() {
                   Digital kilns don&apos;t need extra input—log schedules elsewhere and keep this card for quick reference.
                 </div>
               )}
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted-foreground">Save this kiln so the studio can reference it later.</p>
+                <Button type="button" onClick={handleAddKiln} className="sm:w-40">
+                  Add kiln
+                </Button>
+              </div>
+
+              <div className="space-y-3 rounded-lg border p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium leading-6 text-foreground">Logged kilns</p>
+                  <p className="text-xs text-muted-foreground">Name, type, and manual details if needed.</p>
+                </div>
+                {kilns.length ? (
+                  <div className="space-y-3">
+                    {kilns.map((kiln, index) => (
+                      <div key={`${kiln.name}-${index}`} className="space-y-2 rounded-md border p-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium leading-6 text-foreground">{kiln.name}</p>
+                            <p className="text-xs text-muted-foreground capitalize">{kiln.type} kiln</p>
+                          </div>
+                          <span className="rounded-full bg-secondary px-3 py-1 text-xs capitalize text-secondary-foreground">
+                            {kiln.type}
+                          </span>
+                        </div>
+
+                        {kiln.type === "manual" ? (
+                          <div className="space-y-1 text-xs text-muted-foreground">
+                            <p className="capitalize">Control: {kiln.manualControl}</p>
+                            {kiln.manualControl === "switches" && kiln.switchCount ? (
+                              <p>Switches: {kiln.switchCount}</p>
+                            ) : null}
+                            {kiln.manualControl === "dials" ? (
+                              <div className="space-y-1">
+                                {kiln.dialCount ? <p>Dials: {kiln.dialCount}</p> : null}
+                                {kiln.dialSettings?.length ? (
+                                  <p>Range: {kiln.dialSettings.join(", ")}</p>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No kilns logged yet—add one to get started.</p>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
