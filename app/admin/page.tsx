@@ -141,7 +141,8 @@ export default function AdminPage() {
   const selectedKiln = kilns.find((kiln) => kiln.id === selectedKilnId) ?? null;
 
   return (
-    <div className="space-y-8">
+    <>
+      <div className="space-y-8">
       <div className="space-y-2">
         <p className="text-sm text-muted-foreground">Centralize studio controls and kiln monitoring.</p>
         <h1 className="text-3xl font-semibold">Admin</h1>
@@ -410,5 +411,6 @@ export default function AdminPage() {
         </div>
       ) : null}
     </Modal>
+    </>
   );
 }
