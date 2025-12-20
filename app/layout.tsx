@@ -19,6 +19,16 @@ export const metadata: Metadata = {
   description: "Next.js App Router starter with Clerk, Prisma, and Supabase storage.",
 };
 
+const isValidPublishableKey = (key?: string) => {
+  if (!key) return false;
+
+  const trimmed = key.trim();
+  const looksLikeKey = /^pk_(test|live)_[A-Za-z0-9]{20,}$/.test(trimmed);
+  const isPlaceholder = trimmed.toLowerCase().includes("your_publishable_key");
+
+  return looksLikeKey && !isPlaceholder;
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -26,7 +36,9 @@ export default function RootLayout({
 }>) {
   const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-  if (!publishableKey) {
+  if (!isValidPublishableKey(publishableKey)) {
+    const hasKey = Boolean(publishableKey?.trim());
+
     return (
       <html lang="en">
         <body
@@ -34,8 +46,12 @@ export default function RootLayout({
         >
           <div className="mx-auto flex min-h-screen max-w-4xl flex-col items-start gap-6 px-6 py-12">
             <div className="rounded-lg border border-dashed border-amber-400/80 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              <p className="font-semibold">Clerk configuration required</p>
-              <p className="mt-2">Add your Clerk keys to .env.local to enable authentication and proxy protection:</p>
+              <p className="font-semibold">{hasKey ? "Clerk key looks invalid" : "Clerk configuration required"}</p>
+              <p className="mt-2">
+                {hasKey
+                  ? "The NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY you provided doesn’t match Clerk’s expected format."
+                  : "Add your Clerk keys to .env.local to enable authentication and proxy protection:"}
+              </p>
               <ul className="mt-3 list-disc space-y-1 pl-5">
                 <li>Set NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY from your Clerk project.</li>
                 <li>Restart the dev server so Clerk loads the new credentials.</li>
