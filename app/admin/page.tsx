@@ -91,7 +91,14 @@ export default function AdminPage() {
       .order("name", { ascending: true });
 
     if (fetchError) {
-      setError("Unable to load kilns. Please try again.");
+      const missingTable =
+        fetchError.code === "42P01" || fetchError.message?.toLowerCase().includes("relation") || false;
+
+      setError(
+        missingTable
+          ? "Kilns table not found. Please create it in Supabase using supabase/kilns.sql."
+          : "Unable to load kilns. Please try again.",
+      );
       setIsLoading(false);
       return;
     }
@@ -141,7 +148,14 @@ export default function AdminPage() {
     const { error: insertError } = await supabase.from("Kilns").insert(payload);
 
     if (insertError) {
-      setError("Unable to add kiln right now. Please try again.");
+      const missingTable =
+        insertError.code === "42P01" || insertError.message?.toLowerCase().includes("relation") || false;
+
+      setError(
+        missingTable
+          ? "Kilns table not found. Please create it in Supabase using supabase/kilns.sql."
+          : "Unable to add kiln right now. Please try again.",
+      );
       setIsSubmitting(false);
       return;
     }
@@ -330,6 +344,7 @@ export default function AdminPage() {
                       <option value="manual">Manual</option>
                     </select>
                   </div>
+                </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="kiln-status">Status</Label>
