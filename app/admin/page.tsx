@@ -19,16 +19,7 @@ export default function AdminPage() {
   const [manualControl, setManualControl] = useState<ManualControl>("switches");
   const [switchCount, setSwitchCount] = useState("1");
   const [dialCount, setDialCount] = useState("1");
-  const [dialSettings, setDialSettings] = useState<string[]>([
-    "Low",
-    "2",
-    "3",
-    "Med",
-    "5",
-    "6",
-    "High",
-    "Off",
-  ]);
+  const [dialSettings, setDialSettings] = useState<string[]>(["Low"]);
   const [newDialSetting, setNewDialSetting] = useState("");
 
   const showManualDetails = kilnType === "manual";
