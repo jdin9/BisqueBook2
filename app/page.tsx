@@ -42,6 +42,11 @@ const pages = [
     href: "/dashboard",
   },
   {
+    title: "Pottery log",
+    description: "Review pottery projects created across every studio in one place.",
+    href: "/pottery",
+  },
+  {
     title: "Documentation",
     description: "Review local setup steps, environment variables, and deployment notes.",
     href: "/docs",
