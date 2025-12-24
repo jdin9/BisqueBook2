@@ -47,11 +47,15 @@ function getPrismaClient() {
 
 export async function ensureDatabaseConnection() {
   if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is missing. Add it to .env.local to enable database access.")
+    return Promise.reject(new Error("DATABASE_URL is missing. Add it to .env.local to enable database access."))
   }
 
-  const client = getPrismaClient()
-  await client.$queryRaw`SELECT 1`
+  try {
+    const client = getPrismaClient()
+    await client.$queryRaw`SELECT 1`
+  } catch (error) {
+    return Promise.reject(error)
+  }
 }
 
 export { getPrismaClient }

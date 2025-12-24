@@ -1,7 +1,7 @@
 import { clerkClient, currentUser } from "@clerk/nextjs/server";
 import type { StudioMember, UserProfile } from "@prisma/client";
 
-import { getPrismaClient } from "@/lib/prisma";
+import { getPrismaClient, isDatabaseConfigured } from "@/lib/prisma";
 
 type DerivedProfile = {
   studioId: string | null;
@@ -16,6 +16,7 @@ export async function getCurrentUserProfile(userId?: string): Promise<CurrentUse
   const resolvedUserId = userId ?? sessionUser?.id;
 
   if (!resolvedUserId) return null;
+  if (!isDatabaseConfigured()) return null;
 
   const clerk = await clerkClient();
   const clerkUser =
