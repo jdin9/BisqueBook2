@@ -47,6 +47,7 @@ export default function AdminPage() {
   const [dialSettings, setDialSettings] = useState<string[]>(["Low"]);
   const [newDialSetting, setNewDialSetting] = useState("");
   const [kilnStatus, setKilnStatus] = useState<Status>("active");
+  const [editingKilnId, setEditingKilnId] = useState<string | null>(null);
 
   const [clayBody, setClayBody] = useState("");
   const [clayStatus, setClayStatus] = useState<Status>("active");
@@ -114,6 +115,7 @@ export default function AdminPage() {
     setDialSettings(["Low"]);
     setNewDialSetting("");
     setKilnStatus("active");
+    setEditingKilnId(null);
   };
 
   const resetClayForm = () => {
@@ -245,13 +247,17 @@ export default function AdminPage() {
       status: kilnStatus,
     } satisfies Omit<KilnRecord, "id">;
 
-    const { error } = await supabase.from("Kilns").insert(payload);
+    const { error } = editingKilnId
+      ? await supabase.from("Kilns").update(payload).eq("id", editingKilnId)
+      : await supabase.from("Kilns").insert(payload);
 
     if (error) {
       setKilnError(
         isMissingTable(error)
           ? "Kilns table not found. Please create it in Supabase using supabase/kilns.sql."
-          : "Unable to add kiln right now. Please try again.",
+          : editingKilnId
+            ? "Unable to update kiln right now. Please try again."
+            : "Unable to add kiln right now. Please try again.",
       );
       setIsSubmittingKiln(false);
       return;
@@ -260,6 +266,22 @@ export default function AdminPage() {
     resetKilnForm();
     await fetchKilns();
     setIsSubmittingKiln(false);
+  };
+
+  const handleEditKiln = (kiln: KilnRecord) => {
+    setEditingKilnId(kiln.id);
+    setKilnIdentifier(kiln.kiln_id);
+    setKilnType(kiln.kiln_type);
+    setKilnControls(kiln.controls ?? "switches");
+    setSwitchCount((kiln.switch_count ?? 1).toString());
+    setDialSettings(kiln.dial_settings?.length ? kiln.dial_settings : ["Low"]);
+    setKilnStatus(kiln.status);
+    setNewDialSetting("");
+    if (kiln.kiln_type === "digital") {
+      setKilnControls("switches");
+      setDialSettings(["Low"]);
+      setSwitchCount("1");
+    }
   };
 
   const handleClaySubmit = async () => {
@@ -478,9 +500,14 @@ export default function AdminPage() {
                                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Status</p>
                                   <p className="font-medium capitalize">{kiln.status}</p>
                                 </div>
-                                <Button type="button" variant="secondary" onClick={() => void toggleKilnStatus(kiln)}>
-                                  {kiln.status === "active" ? "Retire kiln" : "Reactivate kiln"}
-                                </Button>
+                                <div className="flex gap-2">
+                                  <Button type="button" variant="secondary" onClick={() => void toggleKilnStatus(kiln)}>
+                                    {kiln.status === "active" ? "Retire kiln" : "Reactivate kiln"}
+                                  </Button>
+                                  <Button type="button" onClick={() => handleEditKiln(kiln)}>
+                                    Edit
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           ) : null}
@@ -496,10 +523,23 @@ export default function AdminPage() {
               <CardHeader>
                 <CardTitle>Add kiln</CardTitle>
                 <CardDescription>
-                  Capture how each kiln is controlled. Form-only validation matches the admin panel requirements.
+                  {editingKilnId
+                    ? "Update kiln details. Form-only validation matches the admin panel requirements."
+                    : "Capture how each kiln is controlled. Form-only validation matches the admin panel requirements."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {editingKilnId ? (
+                  <div className="flex flex-col gap-2 rounded-md border border-muted bg-muted/40 px-3 py-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-medium text-foreground">Editing kiln</p>
+                      <p className="text-xs">ID: {kilnIdentifier || editingKilnId}</p>
+                    </div>
+                    <Button variant="ghost" onClick={resetKilnForm} className="sm:w-auto">
+                      Cancel edit
+                    </Button>
+                  </div>
+                ) : null}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="kiln-id">Kiln ID</Label>
@@ -626,7 +666,7 @@ export default function AdminPage() {
                     Kiln ID, type, and status are required. Manual kilns need controls and either switch counts or dial settings.
                   </div>
                   <Button type="button" onClick={() => void handleKilnSubmit()} disabled={isSubmittingKiln}>
-                    {isSubmittingKiln ? "Adding..." : "Add kiln"}
+                    {isSubmittingKiln ? (editingKilnId ? "Saving..." : "Adding...") : editingKilnId ? "Save changes" : "Add kiln"}
                   </Button>
                 </div>
               </CardContent>
