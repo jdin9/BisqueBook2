@@ -361,6 +361,7 @@ export default function AdminPage() {
                   </div>
                 </div>
 
+                {/* Manual-only controls */}
                 {showManualDetails ? (
                   <div className="space-y-4 rounded-lg border p-4">
                     <div className="space-y-1">
