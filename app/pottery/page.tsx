@@ -45,15 +45,40 @@ type ClayOption = {
   name: string;
 };
 
-async function fetchActiveClays(studioId: string | null) {
-  if (!isDatabaseConfigured() || !studioId) return [];
+type ClayFetchResult = {
+  clays: ClayOption[];
+  clayError?: string;
+};
+
+async function fetchActiveClays(studioId: string | null): Promise<ClayFetchResult> {
+  if (!isDatabaseConfigured() || !studioId) return { clays: [], clayError: undefined };
 
   const prisma = getPrismaClient();
-  return prisma.clay.findMany({
-    where: { studioId, isActive: true },
-    orderBy: { name: "asc" },
-    select: { id: true, name: true },
-  });
+  try {
+    const clays = await prisma.clay.findMany({
+      where: { studioId, isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    });
+
+    return { clays };
+  } catch (error) {
+    console.error("Failed to load active clays with isActive filter; falling back", error);
+    try {
+      const clays = await prisma.clay.findMany({
+        where: { studioId },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      });
+      return {
+        clays,
+        clayError: "Active-clay filter unavailable; showing all clays. Run latest migrations to enable filtering.",
+      };
+    } catch (innerError) {
+      console.error("Failed to load clays", innerError);
+      return { clays: [], clayError: "Unable to load clay list right now." };
+    }
+  }
 }
 
 function buildStudioSummaries(projects: ProjectLogResult["projects"]) {
@@ -141,26 +166,31 @@ async function createProjectAction(prevState: CreateProjectState, formData: Form
 
   const prisma = getPrismaClient();
 
-  if (clayId) {
-    const clay = await prisma.clay.findFirst({
-      where: { id: clayId, studioId: profile.studioId, isActive: true },
-      select: { id: true },
-    });
+  try {
+    if (clayId) {
+      const clay = await prisma.clay.findFirst({
+        where: { id: clayId, studioId: profile.studioId, isActive: true },
+        select: { id: true },
+      });
 
-    if (!clay) {
-      return { status: "error", message: "Selected clay is not available for your studio." };
+      if (!clay) {
+        return { status: "error", message: "Selected clay is not available for your studio." };
+      }
     }
-  }
 
-  await prisma.project.create({
-    data: {
-      studioId: profile.studioId,
-      name: title,
-      description: notes || null,
-      clayId,
-      createdById: profile.id,
-    },
-  });
+    await prisma.project.create({
+      data: {
+        studioId: profile.studioId,
+        name: title,
+        description: notes || null,
+        clayId,
+        createdById: profile.id,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to create project", error);
+    return { status: "error", message: "Unable to save project. Run migrations and try again." };
+  }
 
   revalidatePath("/pottery");
 
@@ -219,7 +249,8 @@ function ProjectDetails({ project }: { project: ProjectWithRelations }) {
 export default async function PotteryPage() {
   const profile = await getCurrentUserProfile();
   const { projects, error } = await fetchProjectLog();
-  const clays: ClayOption[] = profile ? await fetchActiveClays(profile.studioId) : [];
+  const clayResult = profile ? await fetchActiveClays(profile.studioId) : { clays: [], clayError: undefined };
+  const clays: ClayOption[] = clayResult.clays;
   const makerName = profile?.name || null;
   const canSubmit = Boolean(profile && profile.studioId && isDatabaseConfigured());
   const unavailableReason = !isDatabaseConfigured()
@@ -251,6 +282,11 @@ export default async function PotteryPage() {
         <p className="text-muted-foreground">
           Track every project from every studio and see how makers are using clay bodies, glazes, and kilns over time.
         </p>
+        {clayResult.clayError && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            {clayResult.clayError}
+          </div>
+        )}
       </div>
 
       {error && (
