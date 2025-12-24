@@ -48,13 +48,17 @@ type StudioSummary = {
 };
 
 function buildStudioSummaries(projects: ProjectLogResult["projects"]) {
-  type MutableStudioSummary = StudioSummary & {
+  type StudioAccumulator = {
+    studioId: string;
+    studioName: string;
+    totalProjects: number;
     clayNames: Set<string>;
     glazeNames: Set<string>;
     creators: Set<string>;
+    latestProjectAt: Date | null;
   };
 
-  const summaries = new Map<string, MutableStudioSummary>();
+  const summaries = new Map<string, StudioAccumulator>();
 
   for (const project of projects) {
     const summary =
@@ -67,7 +71,7 @@ function buildStudioSummaries(projects: ProjectLogResult["projects"]) {
         glazeNames: new Set<string>(),
         creators: new Set<string>(),
         latestProjectAt: null,
-      } satisfies MutableStudioSummary);
+      } satisfies StudioAccumulator);
 
     summary.totalProjects += 1;
     if (project.clay?.name) summary.clayNames.add(project.clay.name);
