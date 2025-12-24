@@ -35,6 +35,41 @@ type GlazeRecord = {
   status: Status;
 };
 
+const coneChart = [
+  { cone: "Cone 10", temperature: "2381°F" },
+  { cone: "Cone 9", temperature: "2336°F" },
+  { cone: "Cone 8", temperature: "2305°F" },
+  { cone: "Cone 7", temperature: "2264°F" },
+  { cone: "Cone 6", temperature: "2232°F" },
+  { cone: "Cone 5", temperature: "2194°F" },
+  { cone: "Cone 4", temperature: "2157°F" },
+  { cone: "Cone 3", temperature: "2134°F" },
+  { cone: "Cone 2", temperature: "2124°F" },
+  { cone: "Cone 1", temperature: "2118°F" },
+  { cone: "Cone 01", temperature: "2084°F" },
+  { cone: "Cone 02", temperature: "2068°F" },
+  { cone: "Cone 03", temperature: "2052°F" },
+  { cone: "Cone 04", temperature: "2030°F" },
+  { cone: "Cone 05", temperature: "2014°F" },
+  { cone: "Cone 06", temperature: "1940°F" },
+  { cone: "Cone 07", temperature: "1888°F" },
+  { cone: "Cone 08", temperature: "1830°F" },
+  { cone: "Cone 09", temperature: "1789°F" },
+  { cone: "Cone 010", temperature: "1753°F" },
+  { cone: "Cone 011", temperature: "1693°F" },
+  { cone: "Cone 012", temperature: "1673°F" },
+  { cone: "Cone 013", temperature: "1641°F" },
+  { cone: "Cone 014", temperature: "1623°F" },
+  { cone: "Cone 015", temperature: "1607°F" },
+  { cone: "Cone 016", temperature: "1566°F" },
+  { cone: "Cone 017", temperature: "1540°F" },
+  { cone: "Cone 018", temperature: "1450°F" },
+  { cone: "Cone 019", temperature: "1377°F" },
+  { cone: "Cone 020", temperature: "1323°F" },
+  { cone: "Cone 021", temperature: "1261°F" },
+  { cone: "Cone 022", temperature: "1180°F" },
+];
+
 const selectClassName =
   "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none " +
   "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
@@ -672,6 +707,33 @@ export default function AdminPage() {
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Cone chart</CardTitle>
+              <CardDescription>Quick reference for cone-to-temperature firing targets.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b">
+                    <tr className="[&>th]:py-2 [&>th]:text-left [&>th]:text-xs [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-muted-foreground">
+                      <th scope="col">Cone</th>
+                      <th scope="col">Temperature (°F)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="[&>tr:not(:last-child)]:border-b">
+                    {coneChart.map((row) => (
+                      <tr key={row.cone} className="[&>td]:py-2">
+                        <td className="font-medium">{row.cone}</td>
+                        <td className="text-muted-foreground">{row.temperature}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="pottery" className="space-y-6">
