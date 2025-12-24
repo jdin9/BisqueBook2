@@ -23,7 +23,9 @@ export function SiteHeader() {
           <Link href="/admin" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
             Admin
           </Link>
-          <span className="text-sm text-muted-foreground">Pottery</span>
+          <Link href="/pottery" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+            Pottery
+          </Link>
           <SignedOut>
             <SignInButton mode="modal">
               <Button variant="default" size="sm" className="shadow-[0_10px_40px_-18px_rgba(83,51,140,0.5)]">
