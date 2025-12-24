@@ -81,6 +81,7 @@ model Clay {
   studioId     String
   name         String
   manufacturer String?
+  isActive     Boolean  @default(true)
   cone         String?
   notes        String?
   createdAt    DateTime @default(now())
