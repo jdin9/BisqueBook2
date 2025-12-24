@@ -53,13 +53,13 @@ npm run lint
 - `lib/storage.ts` exposes Supabase anon and service-role clients.
 - `ensureStorageBucketExists` can be used at startup or in a setup route to make sure your bucket is created.
 
-## Kilns admin tab (Supabase setup)
-- The admin kiln UI reads and writes directly to a Supabase table named `Kilns`.
-- Create the table by running `supabase/kilns.sql` in the Supabase SQL editor (or via `psql`).
+## Admin tabs (Supabase setup)
+- The kiln tab writes to a Supabase table named `Kilns`; the pottery tab writes to `Clays` and `Glazes`.
+- Create all three tables by running `supabase/kilns.sql` in the Supabase SQL editor (or via `psql`).
 - Required environment variables (already listed in `.env.example`):
   - `NEXT_PUBLIC_SUPABASE_URL`
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- If the table is missing, the UI will show: `Kilns table not found. Please create it in Supabase using supabase/kilns.sql.`
+- If any tables are missing, the UI will show a message asking you to create them with `supabase/kilns.sql.`
 
 ## Deployment notes
 - Vercel: add all environment variables from `.env.example` to your Project Settings and redeploy.
