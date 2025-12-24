@@ -25,6 +25,14 @@ export function getSupabaseServiceRoleClient(): SupabaseClient {
 }
 
 export async function ensureStorageBucketExists(bucketName?: string) {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return Promise.reject(
+      new Error(
+        "Missing Supabase environment variables. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to manage storage buckets.",
+      ),
+    );
+  }
+
   const bucket = bucketName || process.env.SUPABASE_STORAGE_BUCKET || "attachments";
   const supabase = getSupabaseServiceRoleClient();
   const { data, error } = await supabase.storage.getBucket(bucket);
