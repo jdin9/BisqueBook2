@@ -344,7 +344,6 @@ export default function AdminPage() {
                       <option value="manual">Manual</option>
                     </select>
                   </div>
-                </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="kiln-status">Status</Label>
