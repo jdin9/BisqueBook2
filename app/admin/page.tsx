@@ -8,17 +8,31 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+type Status = "active" | "retired";
 type KilnType = "digital" | "manual";
-type ManualControl = "switches" | "dials";
+type KilnControls = "dials" | "switches";
 
 type KilnRecord = {
-  id: string | number;
-  name: string;
-  controller: "digital" | "manual";
-  manual_type: "switches" | "dials" | null;
-  trigger_count: number | null;
+  id: string;
+  kiln_id: string;
+  kiln_type: KilnType;
+  controls: KilnControls | null;
   dial_settings: string[] | null;
-  status: "active" | "retired";
+  switch_count: number | null;
+  status: Status;
+};
+
+type ClayRecord = {
+  id: string;
+  clay_body: string;
+  status: Status;
+};
+
+type GlazeRecord = {
+  id: string;
+  glaze_name: string;
+  brand: string;
+  status: Status;
 };
 
 const selectClassName =
@@ -27,18 +41,37 @@ const selectClassName =
 
 export default function AdminPage() {
   const [kilnType, setKilnType] = useState<KilnType>("digital");
-  const [manualControl, setManualControl] = useState<ManualControl>("switches");
-  const [kilnName, setKilnName] = useState("");
-  const [triggerCount, setTriggerCount] = useState("1");
+  const [kilnControls, setKilnControls] = useState<KilnControls>("switches");
+  const [kilnIdentifier, setKilnIdentifier] = useState("");
+  const [switchCount, setSwitchCount] = useState("1");
   const [dialSettings, setDialSettings] = useState<string[]>(["Low"]);
   const [newDialSetting, setNewDialSetting] = useState("");
-  const [status, setStatus] = useState<"active" | "retired">("active");
+  const [kilnStatus, setKilnStatus] = useState<Status>("active");
+  const [editingKilnId, setEditingKilnId] = useState<string | null>(null);
+
+  const [clayBody, setClayBody] = useState("");
+  const [clayStatus, setClayStatus] = useState<Status>("active");
+
+  const [glazeName, setGlazeName] = useState("");
+  const [glazeBrand, setGlazeBrand] = useState("");
+  const [glazeStatus, setGlazeStatus] = useState<Status>("active");
 
   const [kilns, setKilns] = useState<KilnRecord[]>([]);
-  const [selectedKilnId, setSelectedKilnId] = useState<string | number | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [clays, setClays] = useState<ClayRecord[]>([]);
+  const [glazes, setGlazes] = useState<GlazeRecord[]>([]);
+  const [selectedKilnId, setSelectedKilnId] = useState<string | null>(null);
+
+  const [kilnError, setKilnError] = useState<string | null>(null);
+  const [clayError, setClayError] = useState<string | null>(null);
+  const [glazeError, setGlazeError] = useState<string | null>(null);
+
+  const [isLoadingKilns, setIsLoadingKilns] = useState(false);
+  const [isLoadingClays, setIsLoadingClays] = useState(false);
+  const [isLoadingGlazes, setIsLoadingGlazes] = useState(false);
+
+  const [isSubmittingKiln, setIsSubmittingKiln] = useState(false);
+  const [isSubmittingClay, setIsSubmittingClay] = useState(false);
+  const [isSubmittingGlaze, setIsSubmittingGlaze] = useState(false);
 
   const supabase = useMemo(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -52,11 +85,14 @@ export default function AdminPage() {
   }, []);
 
   const showManualDetails = kilnType === "manual";
-  const showDials = showManualDetails && manualControl === "dials";
+  const showDials = showManualDetails && kilnControls === "dials";
 
   const dialSettingPlaceholder = useMemo(() => {
     return dialSettings.length ? `Example: ${dialSettings.join(", ")}` : "Example: Low, 2, 3, Med, 5, 6, High, Off";
   }, [dialSettings]);
+
+  const isMissingTable = (error: { code?: string; message?: string } | null) =>
+    Boolean(error?.code === "42P01" || error?.message?.toLowerCase().includes("relation"));
 
   const handleDialSettingChange = (index: number, value: string) => {
     const updated = [...dialSettings];
@@ -71,114 +107,280 @@ export default function AdminPage() {
     setNewDialSetting("");
   };
 
-  const resetForm = () => {
-    setKilnName("");
+  const resetKilnForm = () => {
+    setKilnIdentifier("");
     setKilnType("digital");
-    setManualControl("switches");
-    setTriggerCount("1");
+    setKilnControls("switches");
+    setSwitchCount("1");
     setDialSettings(["Low"]);
     setNewDialSetting("");
-    setStatus("active");
+    setKilnStatus("active");
+    setEditingKilnId(null);
+  };
+
+  const resetClayForm = () => {
+    setClayBody("");
+    setClayStatus("active");
+  };
+
+  const resetGlazeForm = () => {
+    setGlazeName("");
+    setGlazeBrand("");
+    setGlazeStatus("active");
   };
 
   const fetchKilns = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+    setIsLoadingKilns(true);
+    setKilnError(null);
 
-    const { data, error: fetchError } = await supabase
+    const { data, error } = await supabase
       .from("Kilns")
-      .select("id, name, controller, manual_type, trigger_count, dial_settings, status")
-      .order("name", { ascending: true });
+      .select("id, kiln_id, kiln_type, controls, dial_settings, switch_count, status")
+      .order("kiln_id", { ascending: true });
 
-    if (fetchError) {
-      const missingTable =
-        fetchError.code === "42P01" || fetchError.message?.toLowerCase().includes("relation") || false;
-
-      setError(
-        missingTable
+    if (error) {
+      setKilnError(
+        isMissingTable(error)
           ? "Kilns table not found. Please create it in Supabase using supabase/kilns.sql."
           : "Unable to load kilns. Please try again.",
       );
-      setIsLoading(false);
+      setIsLoadingKilns(false);
       return;
     }
 
     setKilns((data as KilnRecord[]) || []);
-    setIsLoading(false);
+    setIsLoadingKilns(false);
   }, [supabase]);
 
+  const fetchClays = useCallback(async () => {
+    setIsLoadingClays(true);
+    setClayError(null);
+
+    const { data, error } = await supabase
+      .from("Clays")
+      .select("id, clay_body, status")
+      .order("clay_body", { ascending: true });
+
+    if (error) {
+      setClayError(
+        isMissingTable(error)
+          ? "Clays table not found. Please create it in Supabase using supabase/kilns.sql."
+          : "Unable to load clay bodies. Please try again.",
+      );
+      setIsLoadingClays(false);
+      return;
+    }
+
+    setClays((data as ClayRecord[]) || []);
+    setIsLoadingClays(false);
+  }, [supabase]);
+
+  const fetchGlazes = useCallback(async () => {
+    setIsLoadingGlazes(true);
+    setGlazeError(null);
+
+    const { data, error } = await supabase
+      .from("Glazes")
+      .select("id, glaze_name, brand, status")
+      .order("glaze_name", { ascending: true });
+
+    if (error) {
+      setGlazeError(
+        isMissingTable(error)
+          ? "Glazes table not found. Please create it in Supabase using supabase/kilns.sql."
+          : "Unable to load glazes. Please try again.",
+      );
+      setIsLoadingGlazes(false);
+      return;
+    }
+
+    setGlazes((data as GlazeRecord[]) || []);
+    setIsLoadingGlazes(false);
+  }, [supabase]);
+
+  // We need to populate Supabase-backed admin tables on mount; state updates are contained within each fetch helper.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     void fetchKilns();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void fetchClays();
+    void fetchGlazes();
+  }, [fetchKilns, fetchClays, fetchGlazes]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
-  const handleSubmit = async () => {
-    setError(null);
+  const handleKilnSubmit = async () => {
+    setKilnError(null);
 
-    const trimmedName = kilnName.trim();
-    if (!trimmedName) {
-      setError("Kiln name is required.");
+    const trimmedIdentifier = kilnIdentifier.trim();
+    if (!trimmedIdentifier) {
+      setKilnError("Kiln ID is required.");
       return;
     }
+
+    const cleanedDialSettings = dialSettings.map((setting) => setting.trim()).filter(Boolean);
 
     if (kilnType === "manual") {
-      const countNumber = Number(triggerCount);
-      if (!triggerCount || Number.isNaN(countNumber) || countNumber <= 0) {
-        setError("Please provide how many switches or dials the kiln has.");
+      if (!kilnControls) {
+        setKilnError("Controls are required for manual kilns.");
         return;
       }
 
-      if (manualControl === "dials" && (!dialSettings.length || dialSettings.some((setting) => !setting.trim()))) {
-        setError("Please list at least one dial setting.");
+      const countNumber = Number(switchCount);
+      if (kilnControls === "switches" && (Number.isNaN(countNumber) || countNumber <= 0)) {
+        setKilnError("Please enter the number of switches (must be greater than 0).");
+        return;
+      }
+
+      if (kilnControls === "dials" && cleanedDialSettings.length === 0) {
+        setKilnError("Please list at least one dial setting.");
         return;
       }
     }
 
-    setIsSubmitting(true);
+    setIsSubmittingKiln(true);
 
     const payload = {
-      name: trimmedName,
-      controller: kilnType,
-      manual_type: kilnType === "manual" ? manualControl : null,
-      trigger_count: kilnType === "manual" ? Number(triggerCount) : null,
-      dial_settings: kilnType === "manual" && manualControl === "dials" ? dialSettings : [],
-      status,
+      kiln_id: trimmedIdentifier,
+      kiln_type: kilnType,
+      controls: kilnType === "manual" ? kilnControls : null,
+      dial_settings: kilnType === "manual" && kilnControls === "dials" ? cleanedDialSettings : null,
+      switch_count: kilnType === "manual" && kilnControls === "switches" ? Number(switchCount) : null,
+      status: kilnStatus,
     } satisfies Omit<KilnRecord, "id">;
 
-    const { error: insertError } = await supabase.from("Kilns").insert(payload);
+    const { error } = editingKilnId
+      ? await supabase.from("Kilns").update(payload).eq("id", editingKilnId)
+      : await supabase.from("Kilns").insert(payload);
 
-    if (insertError) {
-      const missingTable =
-        insertError.code === "42P01" || insertError.message?.toLowerCase().includes("relation") || false;
-
-      setError(
-        missingTable
+    if (error) {
+      setKilnError(
+        isMissingTable(error)
           ? "Kilns table not found. Please create it in Supabase using supabase/kilns.sql."
-          : "Unable to add kiln right now. Please try again.",
+          : editingKilnId
+            ? "Unable to update kiln right now. Please try again."
+            : "Unable to add kiln right now. Please try again.",
       );
-      setIsSubmitting(false);
+      setIsSubmittingKiln(false);
       return;
     }
 
-    resetForm();
+    resetKilnForm();
     await fetchKilns();
-    setIsSubmitting(false);
+    setIsSubmittingKiln(false);
+  };
+
+  const handleEditKiln = (kiln: KilnRecord) => {
+    setEditingKilnId(kiln.id);
+    setKilnIdentifier(kiln.kiln_id);
+    setKilnType(kiln.kiln_type);
+    setKilnControls(kiln.controls ?? "switches");
+    setSwitchCount((kiln.switch_count ?? 1).toString());
+    setDialSettings(kiln.dial_settings?.length ? kiln.dial_settings : ["Low"]);
+    setKilnStatus(kiln.status);
+    setNewDialSetting("");
+    if (kiln.kiln_type === "digital") {
+      setKilnControls("switches");
+      setDialSettings(["Low"]);
+      setSwitchCount("1");
+    }
+  };
+
+  const handleClaySubmit = async () => {
+    setClayError(null);
+
+    const trimmedBody = clayBody.trim();
+    if (!trimmedBody) {
+      setClayError("Clay body is required.");
+      return;
+    }
+
+    setIsSubmittingClay(true);
+
+    const { error } = await supabase
+      .from("Clays")
+      .insert({ clay_body: trimmedBody, status: clayStatus } satisfies Omit<ClayRecord, "id">);
+
+    if (error) {
+      setClayError(
+        isMissingTable(error)
+          ? "Clays table not found. Please create it in Supabase using supabase/kilns.sql."
+          : "Unable to add clay body right now. Please try again.",
+      );
+      setIsSubmittingClay(false);
+      return;
+    }
+
+    resetClayForm();
+    await fetchClays();
+    setIsSubmittingClay(false);
+  };
+
+  const handleGlazeSubmit = async () => {
+    setGlazeError(null);
+
+    const trimmedName = glazeName.trim();
+    const trimmedBrand = glazeBrand.trim();
+
+    if (!trimmedName || !trimmedBrand) {
+      setGlazeError("Glaze name and brand are required.");
+      return;
+    }
+
+    setIsSubmittingGlaze(true);
+
+    const { error } = await supabase
+      .from("Glazes")
+      .insert({ glaze_name: trimmedName, brand: trimmedBrand, status: glazeStatus } satisfies Omit<GlazeRecord, "id">);
+
+    if (error) {
+      setGlazeError(
+        isMissingTable(error)
+          ? "Glazes table not found. Please create it in Supabase using supabase/kilns.sql."
+          : "Unable to add glaze right now. Please try again.",
+      );
+      setIsSubmittingGlaze(false);
+      return;
+    }
+
+    resetGlazeForm();
+    await fetchGlazes();
+    setIsSubmittingGlaze(false);
   };
 
   const toggleKilnStatus = async (kiln: KilnRecord) => {
-    const nextStatus = kiln.status === "active" ? "retired" : "active";
-    const { error: updateError } = await supabase
-      .from("Kilns")
-      .update({ status: nextStatus })
-      .eq("id", kiln.id);
+    const nextStatus: Status = kiln.status === "active" ? "retired" : "active";
+    const { error } = await supabase.from("Kilns").update({ status: nextStatus }).eq("id", kiln.id);
 
-    if (updateError) {
-      setError("Unable to update kiln status. Please try again.");
+    if (error) {
+      setKilnError("Unable to update kiln status. Please try again.");
       return;
     }
 
     await fetchKilns();
     setSelectedKilnId(kiln.id);
+  };
+
+  const toggleClayStatus = async (clay: ClayRecord) => {
+    const nextStatus: Status = clay.status === "active" ? "retired" : "active";
+    const { error } = await supabase.from("Clays").update({ status: nextStatus }).eq("id", clay.id);
+
+    if (error) {
+      setClayError("Unable to update clay status. Please try again.");
+      return;
+    }
+
+    await fetchClays();
+  };
+
+  const toggleGlazeStatus = async (glaze: GlazeRecord) => {
+    const nextStatus: Status = glaze.status === "active" ? "retired" : "active";
+    const { error } = await supabase.from("Glazes").update({ status: nextStatus }).eq("id", glaze.id);
+
+    if (error) {
+      setGlazeError("Unable to update glaze status. Please try again.");
+      return;
+    }
+
+    await fetchGlazes();
   };
 
   return (
@@ -226,12 +428,12 @@ export default function AdminPage() {
                 <CardDescription>Review and manage all tracked kilns.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {error ? (
+                {kilnError ? (
                   <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                    {error}
+                    {kilnError}
                   </div>
                 ) : null}
-                {isLoading ? (
+                {isLoadingKilns ? (
                   <p className="text-sm text-muted-foreground">Loading kilns...</p>
                 ) : kilns.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No kilns added yet.</p>
@@ -247,9 +449,9 @@ export default function AdminPage() {
                             className="flex w-full items-center justify-between rounded-lg px-4 py-3 text-left transition-colors hover:bg-muted/60"
                           >
                             <div className="space-y-1">
-                              <p className="text-sm font-medium">{kiln.name}</p>
+                              <p className="text-sm font-medium">{kiln.kiln_id}</p>
                               <p className="text-xs text-muted-foreground">
-                                Controller: {kiln.controller === "manual" ? "Manual" : "Digital"} · Status: {" "}
+                                Type: {kiln.kiln_type === "manual" ? "Manual" : "Digital"} · Status:{" "}
                                 <span className={kiln.status === "active" ? "text-emerald-600" : "text-muted-foreground"}>
                                   {kiln.status === "active" ? "Active" : "Retired"}
                                 </span>
@@ -260,19 +462,20 @@ export default function AdminPage() {
 
                           {isOpen ? (
                             <div className="space-y-3 border-t px-4 py-3 text-sm">
-                              {kiln.controller === "manual" ? (
+                              {kiln.kiln_type === "manual" ? (
                                 <div className="space-y-2">
                                   <div className="flex items-center justify-between">
-                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Manual control</p>
-                                    <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium">
-                                      {kiln.manual_type === "dials" ? "Dials" : "Switches"}
+                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Controls</p>
+                                    <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium capitalize">
+                                      {kiln.controls}
                                     </span>
                                   </div>
-                                  <p className="text-muted-foreground">
-                                    {kiln.trigger_count || 0} {kiln.manual_type === "switches" ? "switch" : "dial"}
-                                    {kiln.trigger_count === 1 ? "" : "s"}
-                                  </p>
-                                  {kiln.manual_type === "dials" && kiln.dial_settings?.length ? (
+                                  {kiln.controls === "switches" ? (
+                                    <p className="text-muted-foreground">
+                                      {kiln.switch_count || 0} switch{kiln.switch_count === 1 ? "" : "es"}
+                                    </p>
+                                  ) : null}
+                                  {kiln.controls === "dials" && kiln.dial_settings?.length ? (
                                     <div className="space-y-1">
                                       <p className="text-xs uppercase tracking-wide text-muted-foreground">Dial settings</p>
                                       <div className="flex flex-wrap gap-2">
@@ -289,7 +492,7 @@ export default function AdminPage() {
                                   ) : null}
                                 </div>
                               ) : (
-                                <p className="text-muted-foreground">Digital kiln — no manual controls to log.</p>
+                                <p className="text-muted-foreground">Digital kiln — manual controls not required.</p>
                               )}
 
                               <div className="flex items-center justify-between">
@@ -297,9 +500,14 @@ export default function AdminPage() {
                                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Status</p>
                                   <p className="font-medium capitalize">{kiln.status}</p>
                                 </div>
-                                <Button type="button" variant="secondary" onClick={() => void toggleKilnStatus(kiln)}>
-                                  {kiln.status === "active" ? "Retire kiln" : "Reactivate kiln"}
-                                </Button>
+                                <div className="flex gap-2">
+                                  <Button type="button" variant="secondary" onClick={() => void toggleKilnStatus(kiln)}>
+                                    {kiln.status === "active" ? "Retire kiln" : "Reactivate kiln"}
+                                  </Button>
+                                  <Button type="button" onClick={() => handleEditKiln(kiln)}>
+                                    Edit
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           ) : null}
@@ -315,18 +523,31 @@ export default function AdminPage() {
               <CardHeader>
                 <CardTitle>Add kiln</CardTitle>
                 <CardDescription>
-                  Capture how each kiln is controlled. All fields are required before adding the kiln.
+                  {editingKilnId
+                    ? "Update kiln details. Form-only validation matches the admin panel requirements."
+                    : "Capture how each kiln is controlled. Form-only validation matches the admin panel requirements."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {editingKilnId ? (
+                  <div className="flex flex-col gap-2 rounded-md border border-muted bg-muted/40 px-3 py-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-medium text-foreground">Editing kiln</p>
+                      <p className="text-xs">ID: {kilnIdentifier || editingKilnId}</p>
+                    </div>
+                    <Button variant="ghost" onClick={resetKilnForm} className="sm:w-auto">
+                      Cancel edit
+                    </Button>
+                  </div>
+                ) : null}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="kiln-name">Kiln Name</Label>
+                    <Label htmlFor="kiln-id">Kiln ID</Label>
                     <Input
-                      id="kiln-name"
-                      placeholder="Studio kiln label (e.g., Skutt 1027)"
-                      value={kilnName}
-                      onChange={(event) => setKilnName(event.target.value)}
+                      id="kiln-id"
+                      placeholder="Freeform kiln identifier"
+                      value={kilnIdentifier}
+                      onChange={(event) => setKilnIdentifier(event.target.value)}
                       required
                     />
                   </div>
@@ -340,7 +561,7 @@ export default function AdminPage() {
                       onChange={(event) => setKilnType(event.target.value as KilnType)}
                       required
                     >
-                      <option value="digital">Digital (no follow-up controls)</option>
+                      <option value="digital">Digital</option>
                       <option value="manual">Manual</option>
                     </select>
                   </div>
@@ -350,8 +571,8 @@ export default function AdminPage() {
                     <select
                       id="kiln-status"
                       className={selectClassName}
-                      value={status}
-                      onChange={(event) => setStatus(event.target.value as "active" | "retired")}
+                      value={kilnStatus}
+                      onChange={(event) => setKilnStatus(event.target.value as Status)}
                       required
                     >
                       <option value="active">Active</option>
@@ -360,19 +581,18 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* Manual-only controls */}
                 {showManualDetails ? (
                   <div className="space-y-4 rounded-lg border p-4">
                     <div className="space-y-1">
-                      <Label htmlFor="manual-control">Manual control type</Label>
+                      <Label htmlFor="manual-control">Controls</Label>
                       <p className="text-sm text-muted-foreground">
-                        Choose whether the kiln uses switches or dial markings so you can record the right counts and ranges.
+                        Choose whether the manual kiln uses switches or dial markings.
                       </p>
                       <select
                         id="manual-control"
                         className={selectClassName}
-                        value={manualControl}
-                        onChange={(event) => setManualControl(event.target.value as ManualControl)}
+                        value={kilnControls}
+                        onChange={(event) => setKilnControls(event.target.value as KilnControls)}
                         required
                       >
                         <option value="switches">Switches</option>
@@ -382,17 +602,17 @@ export default function AdminPage() {
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label htmlFor="trigger-count">
-                          {manualControl === "switches" ? "Number of switches" : "Number of dials"}
+                        <Label htmlFor="switch-count">
+                          {kilnControls === "switches" ? "Number of switches" : "Number of dials"}
                         </Label>
                         <Input
-                          id="trigger-count"
+                          id="switch-count"
                           type="number"
                           min={1}
-                          value={triggerCount}
-                          onChange={(event) => setTriggerCount(event.target.value)}
+                          value={switchCount}
+                          onChange={(event) => setSwitchCount(event.target.value)}
                           placeholder={
-                            manualControl === "switches"
+                            kilnControls === "switches"
                               ? "Enter how many switches are on the kiln"
                               : "Enter how many dials are on the kiln"
                           }
@@ -437,16 +657,16 @@ export default function AdminPage() {
                   </div>
                 ) : (
                   <div className="rounded-lg border p-4 text-sm text-muted-foreground">
-                    Digital kilns don’t need extra input—log schedules elsewhere and keep this card for quick reference.
+                    Digital kilns don’t need extra input—enter the kiln ID and status to save it.
                   </div>
                 )}
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="text-sm text-muted-foreground">
-                    All fields are required to add a kiln to the list. Details save directly to Supabase.
+                    Kiln ID, type, and status are required. Manual kilns need controls and either switch counts or dial settings.
                   </div>
-                  <Button type="button" onClick={() => void handleSubmit()} disabled={isSubmitting}>
-                    {isSubmitting ? "Adding..." : "Add kiln"}
+                  <Button type="button" onClick={() => void handleKilnSubmit()} disabled={isSubmittingKiln}>
+                    {isSubmittingKiln ? (editingKilnId ? "Saving..." : "Adding...") : editingKilnId ? "Save changes" : "Add kiln"}
                   </Button>
                 </div>
               </CardContent>
@@ -454,17 +674,169 @@ export default function AdminPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="pottery" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Pottery inventory</CardTitle>
-              <CardDescription>Placeholder space for finished pieces and works in progress.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm text-muted-foreground">
-              <p>Catalog upcoming pieces, glazing notes, and pickup timelines once this section is wired up.</p>
-              <p>For now, use the studio and kiln tabs to keep everything moving until pottery tracking goes live.</p>
-            </CardContent>
-          </Card>
+        <TabsContent value="pottery" className="space-y-6">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle>Clay bodies</CardTitle>
+                <CardDescription>Track active and retired clay bodies for studio use.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {clayError ? (
+                  <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {clayError}
+                  </div>
+                ) : null}
+                {isLoadingClays ? (
+                  <p className="text-sm text-muted-foreground">Loading clay bodies...</p>
+                ) : clays.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No clay bodies added yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {clays.map((clay) => (
+                      <div key={clay.id} className="flex items-center justify-between rounded-lg border px-4 py-3">
+                        <div>
+                          <p className="text-sm font-medium">{clay.clay_body}</p>
+                          <p className="text-xs text-muted-foreground capitalize">Status: {clay.status}</p>
+                        </div>
+                        <Button type="button" variant="secondary" onClick={() => void toggleClayStatus(clay)}>
+                          {clay.status === "active" ? "Retire" : "Reactivate"}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle>Add clay</CardTitle>
+                <CardDescription>Log new clay bodies with their current status.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="clay-body">Clay Body</Label>
+                  <Input
+                    id="clay-body"
+                    placeholder="e.g., B-Mix"
+                    value={clayBody}
+                    onChange={(event) => setClayBody(event.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="clay-status">Status</Label>
+                  <select
+                    id="clay-status"
+                    className={selectClassName}
+                    value={clayStatus}
+                    onChange={(event) => setClayStatus(event.target.value as Status)}
+                    required
+                  >
+                    <option value="active">Active</option>
+                    <option value="retired">Retired</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground">Clay body and status are required.</p>
+                  <Button type="button" onClick={() => void handleClaySubmit()} disabled={isSubmittingClay}>
+                    {isSubmittingClay ? "Adding..." : "Add clay"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle>Glazes</CardTitle>
+                <CardDescription>Manage glaze name, brand, and availability.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {glazeError ? (
+                  <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {glazeError}
+                  </div>
+                ) : null}
+                {isLoadingGlazes ? (
+                  <p className="text-sm text-muted-foreground">Loading glazes...</p>
+                ) : glazes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No glazes added yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {glazes.map((glaze) => (
+                      <div key={glaze.id} className="flex items-center justify-between rounded-lg border px-4 py-3">
+                        <div>
+                          <p className="text-sm font-medium">{glaze.glaze_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Brand: {glaze.brand} · Status: <span className="capitalize">{glaze.status}</span>
+                          </p>
+                        </div>
+                        <Button type="button" variant="secondary" onClick={() => void toggleGlazeStatus(glaze)}>
+                          {glaze.status === "active" ? "Retire" : "Reactivate"}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle>Add glaze</CardTitle>
+                <CardDescription>Add glaze names, brands, and their current status.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="glaze-name">Glaze Name</Label>
+                  <Input
+                    id="glaze-name"
+                    placeholder="e.g., Chun Blue"
+                    value={glazeName}
+                    onChange={(event) => setGlazeName(event.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="glaze-brand">Brand</Label>
+                  <Input
+                    id="glaze-brand"
+                    placeholder="e.g., Amaco"
+                    value={glazeBrand}
+                    onChange={(event) => setGlazeBrand(event.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="glaze-status">Status</Label>
+                  <select
+                    id="glaze-status"
+                    className={selectClassName}
+                    value={glazeStatus}
+                    onChange={(event) => setGlazeStatus(event.target.value as Status)}
+                    required
+                  >
+                    <option value="active">Active</option>
+                    <option value="retired">Retired</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground">Glaze name, brand, and status are required.</p>
+                  <Button type="button" onClick={() => void handleGlazeSubmit()} disabled={isSubmittingGlaze}>
+                    {isSubmittingGlaze ? "Adding..." : "Add glaze"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
