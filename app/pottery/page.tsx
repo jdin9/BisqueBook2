@@ -1,4 +1,7 @@
+import { revalidatePath } from "next/cache";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CreateProjectDialog, type CreateProjectState } from "@/components/pottery/create-project-dialog";
+import { getCurrentUserProfile } from "@/lib/auth";
 import { getPrismaClient, isDatabaseConfigured } from "@/lib/prisma";
 
 async function fetchProjectLog() {
@@ -37,15 +40,21 @@ async function fetchProjectLog() {
 type ProjectLogResult = Awaited<ReturnType<typeof fetchProjectLog>>;
 type ProjectWithRelations = ProjectLogResult["projects"][number];
 
-type StudioSummary = {
-  studioId: string;
-  studioName: string;
-  totalProjects: number;
-  clayCount: number;
-  glazeCount: number;
-  distinctCreators: number;
-  latestProjectAt: Date | null;
+type ClayOption = {
+  id: string;
+  name: string;
 };
+
+async function fetchActiveClays(studioId: string | null) {
+  if (!isDatabaseConfigured() || !studioId) return [];
+
+  const prisma = getPrismaClient();
+  return prisma.clay.findMany({
+    where: { studioId, isActive: true },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
+}
 
 function buildStudioSummaries(projects: ProjectLogResult["projects"]) {
   type StudioAccumulator = {
@@ -105,6 +114,59 @@ function formatDate(date: Date | null) {
   }).format(date);
 }
 
+async function createProjectAction(prevState: CreateProjectState, formData: FormData): Promise<CreateProjectState> {
+  "use server";
+
+  if (!isDatabaseConfigured()) {
+    return { status: "error", message: "Database connection is not configured." };
+  }
+
+  const profile = await getCurrentUserProfile();
+
+  if (!profile) {
+    return { status: "error", message: "Sign in to create a project." };
+  }
+
+  if (!profile.studioId) {
+    return { status: "error", message: "Join a studio to log a project." };
+  }
+
+  const title = (formData.get("title") as string | null)?.trim();
+  const notes = (formData.get("notes") as string | null)?.trim();
+  const clayId = (formData.get("clayId") as string | null)?.trim() || null;
+
+  if (!title) {
+    return { status: "error", message: "Title is required." };
+  }
+
+  const prisma = getPrismaClient();
+
+  if (clayId) {
+    const clay = await prisma.clay.findFirst({
+      where: { id: clayId, studioId: profile.studioId, isActive: true },
+      select: { id: true },
+    });
+
+    if (!clay) {
+      return { status: "error", message: "Selected clay is not available for your studio." };
+    }
+  }
+
+  await prisma.project.create({
+    data: {
+      studioId: profile.studioId,
+      name: title,
+      description: notes || null,
+      clayId,
+      createdById: profile.id,
+    },
+  });
+
+  revalidatePath("/pottery");
+
+  return { status: "success", message: "Project added to the log." };
+}
+
 function ProjectDetails({ project }: { project: ProjectWithRelations }) {
   return (
     <Card>
@@ -155,14 +217,37 @@ function ProjectDetails({ project }: { project: ProjectWithRelations }) {
 }
 
 export default async function PotteryPage() {
+  const profile = await getCurrentUserProfile();
   const { projects, error } = await fetchProjectLog();
+  const clays: ClayOption[] = profile ? await fetchActiveClays(profile.studioId) : [];
+  const makerName = profile?.name || null;
+  const canSubmit = Boolean(profile && profile.studioId && isDatabaseConfigured());
+  const unavailableReason = !isDatabaseConfigured()
+    ? "Add DATABASE_URL to enable project creation."
+    : !profile
+      ? "Sign in to add projects."
+      : !profile.studioId
+        ? "Join a studio to add projects."
+        : undefined;
+
   const studioSummaries = buildStudioSummaries(projects);
 
   return (
     <div className="space-y-8">
       <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">Community-wide record</p>
-        <h1 className="text-3xl font-semibold">Pottery projects</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm text-muted-foreground">Community-wide record</p>
+            <h1 className="text-3xl font-semibold">Pottery projects</h1>
+          </div>
+          <CreateProjectDialog
+            action={createProjectAction}
+            clays={clays}
+            makerName={makerName}
+            canSubmit={canSubmit}
+            unavailableReason={unavailableReason}
+          />
+        </div>
         <p className="text-muted-foreground">
           Track every project from every studio and see how makers are using clay bodies, glazes, and kilns over time.
         </p>
