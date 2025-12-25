@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreateProjectDialog, type CreateProjectState } from "@/components/pottery/create-project-dialog";
@@ -55,8 +56,9 @@ async function fetchActiveClays(studioId: string | null): Promise<ClayFetchResul
 
   const prisma = getPrismaClient();
   try {
+    const activeClayWhere = { studioId, isActive: true } as Prisma.ClayWhereInput;
     const clays = await prisma.clay.findMany({
-      where: { studioId, isActive: true },
+      where: activeClayWhere,
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     });
@@ -65,8 +67,9 @@ async function fetchActiveClays(studioId: string | null): Promise<ClayFetchResul
   } catch (error) {
     console.error("Failed to load active clays with isActive filter; falling back", error);
     try {
+      const fallbackClayWhere = { studioId } as Prisma.ClayWhereInput;
       const clays = await prisma.clay.findMany({
-        where: { studioId },
+        where: fallbackClayWhere,
         orderBy: { name: "asc" },
         select: { id: true, name: true },
       });
