@@ -1,7 +1,17 @@
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PotteryGallery } from "@/components/pottery/pottery-gallery";
-import { type PotteryProject } from "@/components/pottery/types";
-import { getSupabaseAnonClient } from "@/lib/storage";
+import type { Prisma } from "@prisma/client";
+import { revalidatePath } from "next/cache";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CreateProjectDialog, type CreateProjectState } from "@/components/pottery/create-project-dialog";
+import { getCurrentUserProfile } from "@/lib/auth";
+import { getPrismaClient, isDatabaseConfigured } from "@/lib/prisma";
+
+async function fetchProjectLog() {
+  if (!isDatabaseConfigured()) {
+    return {
+      projects: [],
+      error: "Database connection is not configured. Set DATABASE_URL to view pottery projects.",
+    };
+  }
 
 export default async function PotteryPage() {
   const { projects, error } = await fetchPotteryProjects();
@@ -83,33 +93,32 @@ type ActivityRow = {
   coneRef: { cone: string; temperature: string } | null;
 };
 
-type ProjectSelectRow =
-  | (ProjectRow & { clay: ProjectRow["clay"] })
-  | (ProjectRow & { clay: ProjectRow["clay"][] });
-
-async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; error?: string }> {
+  const prisma = getPrismaClient();
   try {
-    const supabase = getSupabaseAnonClient();
-    const bucket = "attachments";
+    const activeClayWhere = { studioId, isActive: true } as Prisma.ClayWhereInput;
+    const clays = await prisma.clay.findMany({
+      where: activeClayWhere,
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    });
 
-    const { data: projectRows, error: projectError } = await supabase
-      .from("Projects")
-      .select(
-        `
-        id,
-        title,
-        notes,
-        clay_id,
-        created_at,
-        updated_at,
-        clay:Clays ( clay_body )
-      `,
-      )
-      .eq("archived", false)
-      .order("updated_at", { ascending: false });
-
-    if (projectError) {
-      return { projects: [], error: "Unable to load projects from Supabase. Check table permissions and data." };
+    return { clays };
+  } catch (error) {
+    console.error("Failed to load active clays with isActive filter; falling back", error);
+    try {
+      const fallbackClayWhere = { studioId } as Prisma.ClayWhereInput;
+      const clays = await prisma.clay.findMany({
+        where: fallbackClayWhere,
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      });
+      return {
+        clays,
+        clayError: "Active-clay filter unavailable; showing all clays. Run latest migrations to enable filtering.",
+      };
+    } catch (innerError) {
+      console.error("Failed to load clays", innerError);
+      return { clays: [], clayError: "Unable to load clay list right now." };
     }
 
     const selectRows = (projectRows ?? []) as ProjectSelectRow[];
