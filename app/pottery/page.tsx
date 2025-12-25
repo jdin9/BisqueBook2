@@ -138,7 +138,7 @@ async function fetchProjectFormOptions(): Promise<{
     const makers: MakerOption[] = (usersResult.data?.users ?? []).map((user) => {
       const metadata = (user.user_metadata ?? {}) as { first_name?: string; last_name?: string; full_name?: string };
       const combinedName = [metadata.first_name, metadata.last_name].filter(Boolean).join(" ").trim();
-      const fullName = metadata.full_name || combinedName || user.email_addresses?.[0]?.email_address || "Unknown user";
+      const fullName = metadata.full_name || combinedName || user.email || "Unknown user";
 
       return {
         id: user.id,
