@@ -1,4 +1,5 @@
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AddProjectModal } from "@/components/pottery/add-project-modal";
 import { PotteryGallery } from "@/components/pottery/pottery-gallery";
 import { type PotteryProject } from "@/components/pottery/types";
 import { getSupabaseAnonClient } from "@/lib/storage";
@@ -14,6 +15,7 @@ export default async function PotteryPage() {
             <p className="text-sm text-muted-foreground">Community-wide record</p>
             <h1 className="text-3xl font-semibold">Pottery projects</h1>
           </div>
+          <AddProjectModal />
         </div>
         <p className="text-muted-foreground">
           Browse active projects, materials, and kiln history pulled directly from the Supabase tables that power the
