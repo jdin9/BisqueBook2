@@ -83,6 +83,10 @@ type ActivityRow = {
   coneRef: { cone: string; temperature: string } | null;
 };
 
+type ProjectSelectRow =
+  | (ProjectRow & { clay: ProjectRow["clay"] })
+  | (ProjectRow & { clay: ProjectRow["clay"][] });
+
 async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; error?: string }> {
   try {
     const supabase = getSupabaseAnonClient();
@@ -108,7 +112,21 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
       return { projects: [], error: "Unable to load projects from Supabase. Check table permissions and data." };
     }
 
-    const typedProjects = (projectRows as ProjectRow[]) || [];
+    const selectRows = (projectRows ?? []) as ProjectSelectRow[];
+
+    const typedProjects: ProjectRow[] = selectRows.map((row) => {
+      const clay = Array.isArray(row.clay) ? row.clay[0] ?? null : row.clay ?? null;
+
+      return {
+        id: row.id,
+        title: row.title,
+        notes: row.notes,
+        clay_id: row.clay_id,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        clay,
+      };
+    });
 
     if (!typedProjects.length) {
       return { projects: [] };
