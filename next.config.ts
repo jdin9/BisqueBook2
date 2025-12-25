@@ -6,6 +6,14 @@ const nextConfig: NextConfig = {
     // restricted TLS environments during builds.
     turbopackUseSystemTlsCerts: true,
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+      },
+    ],
+  },
   turbopack: {
     // Force the workspace root to this package to avoid accidental parent lockfile detection warnings.
     root: __dirname,
