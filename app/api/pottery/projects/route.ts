@@ -27,6 +27,18 @@ export async function POST(request: Request) {
     const bucket = process.env.SUPABASE_STORAGE_BUCKET || "attachments";
     await ensureStorageBucketExists(bucket);
 
+    const { data: existingUser, error: existingUserError } = await supabase.auth.admin.getUserById(userId);
+    if (existingUserError || !existingUser?.user) {
+      console.error("Supabase auth user lookup failed", existingUserError);
+      return NextResponse.json(
+        {
+          error:
+            "Unable to save project because the user is missing in Supabase Auth. Ensure the Clerk user is synced or create a matching auth.users entry.",
+        },
+        { status: 400 },
+      );
+    }
+
     const { data: projectInsert, error: projectError } = await supabase
       .from("Projects")
       .insert({ title, clay_id: clayId, user_id: userId, notes })
@@ -35,7 +47,12 @@ export async function POST(request: Request) {
 
     if (projectError || !projectInsert) {
       console.error("Pottery project insert failed", projectError);
-      return NextResponse.json({ error: "Unable to save project. Check Supabase table permissions." }, { status: 500 });
+      return NextResponse.json(
+        {
+          error: `Unable to save project. Check Supabase table permissions. ${projectError?.message ?? ""}`.trim(),
+        },
+        { status: 500 },
+      );
     }
 
     const projectId = projectInsert.id as string;
