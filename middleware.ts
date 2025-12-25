@@ -8,7 +8,7 @@ let warnedAboutClerkConfig = false;
 
 const isProtectedRoute = createRouteMatcher(["/dashboard(.*)"]);
 
-const proxy = hasClerkConfig
+const middleware = hasClerkConfig
   ? clerkMiddleware((auth, req) => {
       if (isProtectedRoute(req)) {
         auth.protect();
@@ -17,14 +17,14 @@ const proxy = hasClerkConfig
   : () => {
       if (!warnedAboutClerkConfig) {
         console.warn(
-          "Clerk proxy disabled: set NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY in .env.local to enable route protection.",
+          "Clerk middleware disabled: set NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY in .env.local to enable route protection.",
         );
         warnedAboutClerkConfig = true;
       }
       return NextResponse.next();
     };
 
-export default proxy;
+export default middleware;
 
 export const config = {
   matcher: ["/((?!.*\\..*|_next).*)", "/(api|trpc)(.*)"],
