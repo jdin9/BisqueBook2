@@ -4,6 +4,7 @@ import { AddProjectModal } from "@/components/pottery/add-project-modal";
 import { PotteryGallery } from "@/components/pottery/pottery-gallery";
 import { type PotteryProject } from "@/components/pottery/types";
 import { getSupabaseAnonClient } from "@/lib/storage";
+import { WelcomeModal } from "@/components/welcome-modal";
 
 export default async function PotteryPage() {
   const { projects, error } = await fetchPotteryProjects();
@@ -13,6 +14,7 @@ export default async function PotteryPage() {
 
   return (
     <div className="space-y-8">
+      <WelcomeModal />
       <div className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
