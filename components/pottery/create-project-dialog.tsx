@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +15,12 @@ const initialState: CreateProjectState = {
   status: "idle",
 };
 
-type ClayOption = {
+export type ClayOption = {
+  id: string;
+  name: string;
+};
+
+export type MakerOption = {
   id: string;
   name: string;
 };
@@ -22,24 +28,31 @@ type ClayOption = {
 type CreateProjectDialogProps = {
   action: (state: CreateProjectState, formData: FormData) => Promise<CreateProjectState>;
   clays: ClayOption[];
-  makerName: string | null;
+  makers: MakerOption[];
   canSubmit: boolean;
   unavailableReason?: string;
 };
 
-export function CreateProjectDialog({ action, clays, makerName, canSubmit, unavailableReason }: CreateProjectDialogProps) {
+export function CreateProjectDialog({ action, clays, makers, canSubmit, unavailableReason }: CreateProjectDialogProps) {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
-  const [state, formAction, pending] = useActionState<CreateProjectState, FormData>(action, initialState);
+  const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
+  const [state, formAction, pending] = useActionState<CreateProjectState, FormData>(
+    async (prevState, formData) => {
+      const result = await action(prevState, formData);
 
-  useEffect(() => {
-    if (state.status === "success") {
-      formRef.current?.reset();
-      // Closing the dialog in response to a successful submission
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setOpen(false);
-    }
-  }, [state.status]);
+      if (result.status === "success") {
+        formRef.current?.reset();
+        setSelectedPhotos([]);
+        router.refresh();
+        setOpen(false);
+      }
+
+      return result;
+    },
+    initialState,
+  );
 
   return (
     <>
@@ -84,8 +97,9 @@ export function CreateProjectDialog({ action, clays, makerName, canSubmit, unava
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                   defaultValue=""
                   disabled={!clays.length}
+                  required
                 >
-                  <option value="">No clay selected</option>
+                  <option value="">Select clay</option>
                   {clays.map((clay) => (
                     <option key={clay.id} value={clay.id}>
                       {clay.name}
@@ -94,6 +108,28 @@ export function CreateProjectDialog({ action, clays, makerName, canSubmit, unava
                 </select>
                 {!clays.length && (
                   <p className="text-xs text-muted-foreground">No active clays available for your studio.</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="makerId">Maker</Label>
+                <select
+                  id="makerId"
+                  name="makerId"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  defaultValue=""
+                  required
+                  disabled={!makers.length}
+                >
+                  <option value="">Select maker</option>
+                  {makers.map((maker) => (
+                    <option key={maker.id} value={maker.id}>
+                      {maker.name}
+                    </option>
+                  ))}
+                </select>
+                {!makers.length && (
+                  <p className="text-xs text-muted-foreground">Add makers to Supabase auth to log projects.</p>
                 )}
               </div>
 
@@ -109,11 +145,28 @@ export function CreateProjectDialog({ action, clays, makerName, canSubmit, unava
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="maker">Maker</Label>
-                <Input id="maker" name="maker" value={makerName ?? "Not signed in"} disabled readOnly />
-                {!makerName && (
-                  <p className="text-xs text-muted-foreground">Sign in to log a project under your name.</p>
-                )}
+                <Label htmlFor="photos">Project photos</Label>
+                <Input
+                  id="photos"
+                  name="photos"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(event) => setSelectedPhotos(Array.from(event.target.files ?? []))}
+                />
+                <p className="text-xs text-muted-foreground">Attach progress photos (max 5 MB per file).</p>
+                {selectedPhotos.length > 0 ? (
+                  <ul className="space-y-1 text-xs text-muted-foreground">
+                    {selectedPhotos.map((file) => (
+                      <li key={file.name} className="flex items-center justify-between">
+                        <span className="truncate" title={file.name}>
+                          {file.name}
+                        </span>
+                        <span>{Math.round(file.size / 1024)} KB</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
 
               {state.status === "error" && state.message && (
