@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
-import { ArrowRight, Plus, X } from "lucide-react";
+import { FormEvent, useMemo, useState } from "react";
+import { ArrowRight, Loader2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type ClayOption = {
@@ -15,15 +15,17 @@ type AddProjectModalProps = {
   makerName: string | null;
 };
 
+type SubmitState = {
+  status: "idle" | "submitting" | "success" | "error";
+  message?: string;
+};
+
 export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
   const [open, setOpen] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const [photoCount, setPhotoCount] = useState(0);
+  const [state, setState] = useState<SubmitState>({ status: "idle" });
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setSubmitted(true);
-  };
+  const canSubmit = useMemo(() => clays.length > 0 && Boolean(makerName), [clays.length, makerName]);
 
   return (
     <>
@@ -47,7 +49,38 @@ export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
               </Button>
             </div>
 
-            <form className="space-y-4 px-6 py-5" onSubmit={handleSubmit}>
+            <form
+              className="space-y-4 px-6 py-5"
+              onSubmit={async (event: FormEvent<HTMLFormElement>) => {
+                event.preventDefault();
+                setState({ status: "submitting" });
+
+                const formData = new FormData(event.currentTarget);
+                if (!makerName) {
+                  setState({ status: "error", message: "Sign in to create a project." });
+                  return;
+                }
+                formData.set("makerName", makerName);
+
+                const response = await fetch("/api/pottery/projects", {
+                  method: "POST",
+                  body: formData,
+                });
+
+                if (!response.ok) {
+                  const result = (await response.json().catch(() => null)) as { error?: string } | null;
+                  setState({
+                    status: "error",
+                    message: result?.error || "Unable to save project. Please try again.",
+                  });
+                  return;
+                }
+
+                event.currentTarget.reset();
+                setPhotoCount(0);
+                setState({ status: "success", message: "Project saved. Refresh the gallery to see it appear." });
+              }}
+            >
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-2 text-sm">
                   <span className="font-medium text-foreground">Project name</span>
@@ -122,9 +155,14 @@ export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
                 </p>
               </label>
 
-              {submitted && (
-                <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-foreground">
-                  Project details captured. Wire this form to Supabase or your preferred endpoint to save it.
+              {state.status === "success" && state.message && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                  {state.message}
+                </div>
+              )}
+              {state.status === "error" && state.message && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {state.message}
                 </div>
               )}
 
@@ -140,7 +178,16 @@ export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
                   <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit">Save project</Button>
+                  <Button type="submit" disabled={!canSubmit || state.status === "submitting"}>
+                    {state.status === "submitting" ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save project"
+                    )}
+                  </Button>
                 </div>
               </div>
             </form>
