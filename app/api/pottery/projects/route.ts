@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { revalidatePath } from "next/cache";
 import { getSupabaseServiceRoleClient } from "@/lib/storage";
 
 export async function POST(request: Request) {
@@ -63,6 +64,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to save photo references." }, { status: 500 });
     }
   }
+
+  revalidatePath("/pottery");
 
   return NextResponse.json({ projectId, photos: uploadedPhotos.length }, { status: 201 });
 }

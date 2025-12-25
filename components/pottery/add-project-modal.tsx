@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Loader2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -24,6 +25,7 @@ export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
   const [open, setOpen] = useState(false);
   const [photoCount, setPhotoCount] = useState(0);
   const [state, setState] = useState<SubmitState>({ status: "idle" });
+  const router = useRouter();
 
   const canSubmit = useMemo(() => clays.length > 0 && Boolean(makerName), [clays.length, makerName]);
 
@@ -78,7 +80,9 @@ export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
 
                 event.currentTarget.reset();
                 setPhotoCount(0);
-                setState({ status: "success", message: "Project saved. Refresh the gallery to see it appear." });
+                setState({ status: "success" });
+                setOpen(false);
+                router.refresh();
               }}
             >
               <div className="grid gap-4 md:grid-cols-2">
