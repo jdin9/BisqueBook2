@@ -83,6 +83,10 @@ type ActivityRow = {
   coneRef: { cone: string; temperature: string } | null;
 };
 
+type ActivitySelectRow =
+  | ActivityRow
+  | (Omit<ActivityRow, "glaze" | "coneRef"> & { glaze: ActivityRow["glaze"][]; coneRef: ActivityRow["coneRef"][] });
+
 type ProjectSelectRow =
   | (ProjectRow & { clay: ProjectRow["clay"] })
   | (ProjectRow & { clay: ProjectRow["clay"][] });
@@ -167,7 +171,27 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
       return { projects: [], error: "Failed to load related project details. Verify ProjectPhotos and Activities data." };
     }
 
-    const activityIds = ((activityRows as ActivityRow[]) || []).map((activity) => activity.id);
+    const selectActivities = (activityRows ?? []) as ActivitySelectRow[];
+
+    const typedActivities: ActivityRow[] = selectActivities.map((activity) => {
+      const glaze = Array.isArray(activity.glaze) ? activity.glaze[0] ?? null : activity.glaze ?? null;
+      const coneRef = Array.isArray(activity.coneRef) ? activity.coneRef[0] ?? null : activity.coneRef ?? null;
+
+      return {
+        id: activity.id,
+        project_id: activity.project_id,
+        type: activity.type,
+        glaze_id: activity.glaze_id,
+        coats: activity.coats,
+        cone: activity.cone,
+        notes: activity.notes,
+        created_at: activity.created_at,
+        glaze,
+        coneRef,
+      };
+    });
+
+    const activityIds = typedActivities.map((activity) => activity.id);
 
     const { data: activityPhotoRows, error: activityPhotoError } = activityIds.length
       ? await supabase
@@ -207,7 +231,7 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
     });
 
     const activitiesByProject = new Map<string, ActivityRow[]>();
-    ((activityRows as ActivityRow[]) || []).forEach((activity) => {
+    typedActivities.forEach((activity) => {
       const list = activitiesByProject.get(activity.project_id) || [];
       list.push(activity);
       activitiesByProject.set(activity.project_id, list);
