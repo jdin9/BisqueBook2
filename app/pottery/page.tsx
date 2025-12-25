@@ -1,10 +1,15 @@
+import { currentUser } from "@clerk/nextjs/server";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AddProjectModal } from "@/components/pottery/add-project-modal";
 import { PotteryGallery } from "@/components/pottery/pottery-gallery";
 import { type PotteryProject } from "@/components/pottery/types";
 import { getSupabaseAnonClient } from "@/lib/storage";
 
 export default async function PotteryPage() {
   const { projects, error } = await fetchPotteryProjects();
+  const { clays } = await fetchActiveClays();
+  const user = await currentUser();
+  const makerName = user ? user.fullName || [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username : null;
 
   return (
     <div className="space-y-8">
@@ -14,6 +19,7 @@ export default async function PotteryPage() {
             <p className="text-sm text-muted-foreground">Community-wide record</p>
             <h1 className="text-3xl font-semibold">Pottery projects</h1>
           </div>
+          <AddProjectModal clays={clays} makerName={makerName} />
         </div>
         <p className="text-muted-foreground">
           Browse active projects, materials, and kiln history pulled directly from the Supabase tables that power the
@@ -90,6 +96,11 @@ type ActivitySelectRow =
 type ProjectSelectRow =
   | (ProjectRow & { clay: ProjectRow["clay"] })
   | (ProjectRow & { clay: ProjectRow["clay"][] });
+
+type ClayRow = {
+  id: string;
+  clay_body: string;
+};
 
 async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; error?: string }> {
   try {
@@ -284,5 +295,25 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
       projects: [],
       error: "Unable to load pottery projects. Verify NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
     };
+  }
+}
+
+async function fetchActiveClays(): Promise<{ clays: { id: string; name: string }[]; error?: string }> {
+  try {
+    const supabase = getSupabaseAnonClient();
+    const { data, error } = await supabase
+      .from("Clays")
+      .select("id, clay_body")
+      .eq("status", "active")
+      .order("clay_body", { ascending: true });
+
+    if (error) {
+      return { clays: [], error: "Unable to load clays." };
+    }
+
+    const clays = (data as ClayRow[] | null)?.map((clay) => ({ id: clay.id, name: clay.clay_body })) ?? [];
+    return { clays };
+  } catch {
+    return { clays: [], error: "Unable to load clays." };
   }
 }
