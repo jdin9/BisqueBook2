@@ -38,11 +38,7 @@ export async function POST(request: Request) {
     const bucket = process.env.SUPABASE_STORAGE_BUCKET || "attachments";
     await ensureStorageBucketExists(bucket);
 
-    const { data: existingUserByEmail, error: userLookupError } = await supabase
-      .from("auth.users")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle<{ id: string }>();
+    const { data: existingUsers, error: listUsersError } = await supabase.auth.admin.listUsers();
 
     if (userLookupError) {
       console.error("Supabase auth user lookup by email failed", userLookupError);
@@ -52,7 +48,11 @@ export async function POST(request: Request) {
       );
     }
 
-    let supabaseUserId = existingUserByEmail?.id;
+    const matchedUser = existingUsers?.users?.find(
+      (user) => user.email?.toLowerCase() === email.toLowerCase(),
+    );
+
+    let supabaseUserId = matchedUser?.id;
 
     if (!supabaseUserId) {
       const { data: createdUser, error: createUserError } = await supabase.auth.admin.createUser({
