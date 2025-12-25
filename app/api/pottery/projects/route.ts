@@ -40,8 +40,8 @@ export async function POST(request: Request) {
 
     const { data: existingUsers, error: listUsersError } = await supabase.auth.admin.listUsers();
 
-    if (userLookupError) {
-      console.error("Supabase auth user lookup by email failed", userLookupError);
+    if (listUsersError) {
+      console.error("Supabase auth user lookup by email failed", listUsersError);
       return NextResponse.json(
         { error: "Unable to save project because Supabase user lookup failed. Try again or contact support." },
         { status: 500 },
