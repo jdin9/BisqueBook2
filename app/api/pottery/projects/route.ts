@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { ensureStorageBucketExists, getSupabaseServiceRoleClient } from "@/lib/storage";
 
@@ -11,6 +11,16 @@ export async function POST(request: Request) {
 
     if (!userId) {
       return NextResponse.json({ error: "You must be signed in to create a project." }, { status: 401 });
+    }
+
+    const clerkUser = await clerkClient.users.getUser(userId);
+    const email = clerkUser.emailAddresses.find((address) => address.id === clerkUser.primaryEmailAddressId)?.emailAddress;
+
+    if (!email) {
+      return NextResponse.json(
+        { error: "Unable to save project. Your account is missing a primary email address in Clerk." },
+        { status: 400 },
+      );
     }
 
     const formData = await request.formData();
@@ -27,21 +37,45 @@ export async function POST(request: Request) {
     const bucket = process.env.SUPABASE_STORAGE_BUCKET || "attachments";
     await ensureStorageBucketExists(bucket);
 
-    const { data: existingUser, error: existingUserError } = await supabase.auth.admin.getUserById(userId);
-    if (existingUserError || !existingUser?.user) {
-      console.error("Supabase auth user lookup failed", existingUserError);
+    const { data: existingUsers, error: listUsersError } = await supabase.auth.admin.listUsers({ email });
+
+    if (listUsersError) {
+      console.error("Supabase auth user lookup by email failed", listUsersError);
       return NextResponse.json(
-        {
-          error:
-            "Unable to save project because the user is missing in Supabase Auth. Ensure the Clerk user is synced or create a matching auth.users entry.",
-        },
-        { status: 400 },
+        { error: "Unable to save project because Supabase user lookup failed. Try again or contact support." },
+        { status: 500 },
       );
+    }
+
+    let supabaseUserId = existingUsers?.users?.[0]?.id;
+
+    if (!supabaseUserId) {
+      const { data: createdUser, error: createUserError } = await supabase.auth.admin.createUser({
+        email,
+        email_confirm: true,
+        user_metadata: {
+          clerkUserId: userId,
+          name: clerkUser.fullName || undefined,
+        },
+      });
+
+      if (createUserError || !createdUser?.user) {
+        console.error("Supabase auth user creation failed", createUserError);
+        return NextResponse.json(
+          {
+            error:
+              "Unable to save project because a Supabase user could not be provisioned for your account. Please check Supabase auth settings.",
+          },
+          { status: 500 },
+        );
+      }
+
+      supabaseUserId = createdUser.user.id;
     }
 
     const { data: projectInsert, error: projectError } = await supabase
       .from("Projects")
-      .insert({ title, clay_id: clayId, user_id: userId, notes })
+      .insert({ title, clay_id: clayId, user_id: supabaseUserId, notes })
       .select("id")
       .single();
 
