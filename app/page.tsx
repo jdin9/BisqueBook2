@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { WelcomeModal } from "@/components/welcome-modal";
 
 const features = [
   {
@@ -61,6 +62,7 @@ const pages = [
 export default function Home() {
   return (
     <div className="space-y-12">
+      <WelcomeModal />
       <section className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-[#f3e8ff] via-background to-[#e0e7ff] px-8 py-12 shadow-2xl sm:px-10">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(168,85,247,0.18),transparent_42%),radial-gradient(circle_at_82%_12%,rgba(99,102,241,0.16),transparent_42%),radial-gradient(circle_at_18%_84%,rgba(236,72,153,0.12),transparent_40%)]" />
         <div className="relative grid gap-8 lg:grid-cols-2 lg:items-center">
