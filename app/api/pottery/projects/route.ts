@@ -13,7 +13,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "You must be signed in to create a project." }, { status: 401 });
     }
 
-    const clerkUser = await clerkClient.users.getUser(userId);
+    const clerk = await clerkClient();
+    const clerkUser = await clerk.users.getUser(userId);
     const email = clerkUser.emailAddresses.find((address) => address.id === clerkUser.primaryEmailAddressId)?.emailAddress;
 
     if (!email) {
