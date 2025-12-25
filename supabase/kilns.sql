@@ -43,3 +43,48 @@ comment on table public."Glazes" is 'Glazes tracked from the pottery admin tab.'
 comment on column public."Glazes".glaze_name is 'Named glaze (e.g., Chun Blue).';
 comment on column public."Glazes".brand is 'Glaze manufacturer or studio mix label.';
 comment on column public."Glazes".status is 'active or retired';
+
+-- Enable RLS for admin tables to keep Supabase consistent with the pottery schema.
+alter table public."Kilns" enable row level security;
+alter table public."Clays" enable row level security;
+alter table public."Glazes" enable row level security;
+
+-- Allow both anon and authenticated roles to read and manage admin tables (no deletes).
+do $$
+begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'Kilns' and policyname = 'Kilns select all') then
+    create policy "Kilns select all" on public."Kilns" for select using (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'Kilns' and policyname = 'Kilns insert all') then
+    create policy "Kilns insert all" on public."Kilns" for insert to anon, authenticated with check (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'Kilns' and policyname = 'Kilns update all') then
+    create policy "Kilns update all" on public."Kilns" for update to anon, authenticated using (true) with check (true);
+  end if;
+end$$;
+
+do $$
+begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'Clays' and policyname = 'Clays select all') then
+    create policy "Clays select all" on public."Clays" for select using (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'Clays' and policyname = 'Clays insert all') then
+    create policy "Clays insert all" on public."Clays" for insert to anon, authenticated with check (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'Clays' and policyname = 'Clays update all') then
+    create policy "Clays update all" on public."Clays" for update to anon, authenticated using (true) with check (true);
+  end if;
+end$$;
+
+do $$
+begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'Glazes' and policyname = 'Glazes select all') then
+    create policy "Glazes select all" on public."Glazes" for select using (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'Glazes' and policyname = 'Glazes insert all') then
+    create policy "Glazes insert all" on public."Glazes" for insert to anon, authenticated with check (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'Glazes' and policyname = 'Glazes update all') then
+    create policy "Glazes update all" on public."Glazes" for update to anon, authenticated using (true) with check (true);
+  end if;
+end$$;
