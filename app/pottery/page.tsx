@@ -1,10 +1,14 @@
 import { currentUser } from "@clerk/nextjs/server";
+import { unstable_noStore as noStore } from "next/cache";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AddProjectModal } from "@/components/pottery/add-project-modal";
 import { PotteryGallery } from "@/components/pottery/pottery-gallery";
 import { type PotteryProject } from "@/components/pottery/types";
 import { getSupabaseAnonClient, getSupabaseServiceRoleClient } from "@/lib/storage";
 import { WelcomeModal } from "@/components/welcome-modal";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function PotteryPage() {
   const { projects, error } = await fetchPotteryProjects();
@@ -106,6 +110,8 @@ type ClayRow = {
 
 async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; error?: string }> {
   try {
+    noStore();
+
     const supabase = getSupabaseAnonClient();
     const storageClient = getSupabaseServiceRoleClient();
     const bucket = process.env.SUPABASE_STORAGE_BUCKET || "attachments";
