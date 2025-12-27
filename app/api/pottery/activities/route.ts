@@ -197,9 +197,8 @@ export async function POST(request: Request) {
 
     const storagePaths = photoRows.map((row) => row.storage_path);
     const signedUrlLookup = new Map<string, string | null>();
-    type SignedUrlOptions = { download?: string | boolean; transform?: { format?: "origin" } };
-    const toWebpTransform = { transform: { format: "webp" } } as const;
-    const signedUrlTransform = toWebpTransform as unknown as SignedUrlOptions;
+    type SignedUrlOptions = { download?: string | boolean; transform?: { width?: number; height?: number; resize?: "cover" | "contain" | "fill"; quality?: number; format?: "origin" } };
+    const heicTransform: SignedUrlOptions = { transform: { quality: 90 } };
 
     if (storagePaths.length) {
       await Promise.all(
@@ -210,7 +209,7 @@ export async function POST(request: Request) {
 
           const { data, error } = await supabase.storage
             .from(bucket)
-            .createSignedUrl(path, 60 * 60 * 24 * 7, needsTransform ? signedUrlTransform : undefined);
+            .createSignedUrl(path, 60 * 60 * 24 * 7, needsTransform ? heicTransform : undefined);
 
           if (error || !data?.signedUrl) {
             console.error("Failed to generate activity photo URL", { path, error });
@@ -230,7 +229,7 @@ export async function POST(request: Request) {
       const signedUrl = signedUrlLookup.get(row.storage_path) || null;
       const { data: publicUrlData } = supabase.storage
         .from(bucket)
-        .getPublicUrl(row.storage_path, needsTransform ? signedUrlTransform : undefined);
+        .getPublicUrl(row.storage_path, needsTransform ? heicTransform : undefined);
       return {
         id: row.id,
         storagePath: row.storage_path,
