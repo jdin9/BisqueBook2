@@ -217,14 +217,24 @@ export async function POST(request: Request) {
       };
     };
 
+    const glazeRelation = activityRow.glaze as { glaze_name?: string }[] | { glaze_name?: string } | null | undefined;
+    const coneRelation = activityRow.coneRef as
+      | { temperature?: number }[]
+      | { temperature?: number }
+      | null
+      | undefined;
     const activity = {
       id: activityRow.id as string,
       type: activityRow.type as "glaze" | "fire",
       notes: (activityRow.notes as string | null) ?? null,
-      glazeName: activityRow.glaze?.glaze_name || undefined,
+      glazeName: Array.isArray(glazeRelation)
+        ? glazeRelation[0]?.glaze_name || undefined
+        : glazeRelation?.glaze_name || undefined,
       coats: activityRow.coats as number | null,
       cone: activityRow.cone as string | null,
-      coneTemperature: activityRow.coneRef?.temperature || null,
+      coneTemperature: Array.isArray(coneRelation)
+        ? coneRelation[0]?.temperature || null
+        : coneRelation?.temperature || null,
       createdAt: activityRow.created_at as string,
       photos: photoRows.map(toPhoto),
     };
