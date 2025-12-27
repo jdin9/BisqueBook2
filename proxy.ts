@@ -1,12 +1,18 @@
+import type { NextRequest } from "next/server";
+
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 const isProtectedRoute = createRouteMatcher(["/dashboard(.*)"]);
 
-export default clerkMiddleware((auth, req) => {
+const proxyHandler = clerkMiddleware((auth, req) => {
   if (isProtectedRoute(req)) {
     auth.protect();
   }
 });
+
+export function proxy(request: NextRequest) {
+  return proxyHandler(request);
+}
 
 export const config = {
   matcher: [
