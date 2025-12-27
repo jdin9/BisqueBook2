@@ -56,7 +56,7 @@ export default function RootLayout({
                   <p className="text-muted-foreground">
                     {hasKey
                       ? "The NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY you provided doesn’t match Clerk’s expected format."
-                      : "Add your Clerk keys to .env.local to enable authentication and middleware protection:"}
+                      : "Add your Clerk keys to .env.local to enable authentication and proxy protection:"}
                   </p>
                   <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
                     <li>Set NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY from your Clerk project.</li>

@@ -31,7 +31,7 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Authentication</CardTitle>
-            <CardDescription>Clerk protects this route via the middleware.</CardDescription>
+            <CardDescription>Clerk protects this route via the proxy.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>Your Clerk user ID: {user.id}</p>
