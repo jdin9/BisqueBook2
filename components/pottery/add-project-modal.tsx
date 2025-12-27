@@ -57,7 +57,8 @@ export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
                 event.preventDefault();
                 setState({ status: "submitting" });
 
-                const formData = new FormData(event.currentTarget);
+                const formElement = event.currentTarget;
+                const formData = new FormData(formElement);
                 if (!makerName) {
                   setState({ status: "error", message: "Sign in to create a project." });
                   return;
@@ -78,7 +79,7 @@ export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
                   return;
                 }
 
-                event.currentTarget.reset();
+                formElement.reset();
                 setPhotoCount(0);
                 setState({ status: "success" });
                 setOpen(false);
