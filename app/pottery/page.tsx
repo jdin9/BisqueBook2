@@ -1,10 +1,14 @@
 import { currentUser } from "@clerk/nextjs/server";
+import { unstable_noStore as noStore } from "next/cache";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AddProjectModal } from "@/components/pottery/add-project-modal";
 import { PotteryGallery } from "@/components/pottery/pottery-gallery";
 import { type PotteryProject } from "@/components/pottery/types";
-import { getSupabaseAnonClient } from "@/lib/storage";
+import { getSupabaseAnonClient, getSupabaseServiceRoleClient } from "@/lib/storage";
 import { WelcomeModal } from "@/components/welcome-modal";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function PotteryPage() {
   const { projects, error } = await fetchPotteryProjects();
@@ -106,8 +110,11 @@ type ClayRow = {
 
 async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; error?: string }> {
   try {
+    noStore();
+
     const supabase = getSupabaseAnonClient();
-    const bucket = "attachments";
+    const storageClient = getSupabaseServiceRoleClient();
+    const bucket = process.env.SUPABASE_STORAGE_BUCKET || "attachments";
 
     const { data: projectRows, error: projectError } = await supabase
       .from("Projects")
@@ -223,7 +230,7 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
     const storagePaths = Array.from(new Set(allPhotoRows.map((row) => row.storage_path)));
 
     const { data: signedUrls, error: signedUrlError } = storagePaths.length
-      ? await supabase.storage.from(bucket).createSignedUrls(storagePaths, 60 * 60 * 24 * 7)
+      ? await storageClient.storage.from(bucket).createSignedUrls(storagePaths, 60 * 60 * 24 * 7)
       : { data: null, error: null };
 
     if (signedUrlError) {
@@ -238,7 +245,7 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
 
     const toPhoto = (row: ProjectPhotoRow | ActivityPhotoRow) => {
       const signedUrl = signedUrlLookup.get(row.storage_path) || null;
-      const { data } = supabase.storage.from(bucket).getPublicUrl(row.storage_path);
+      const { data } = storageClient.storage.from(bucket).getPublicUrl(row.storage_path);
       return {
         id: row.id,
         storagePath: row.storage_path,
