@@ -62,15 +62,15 @@ export function ActivityTimeline({ activities }: ActivityTimelineProps) {
                 </div>
                 {activity.notes && <p className="text-sm text-muted-foreground">{activity.notes}</p>}
                 {activity.photos.length > 0 && (
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {activity.photos.map((photo) => (
-                      <div key={photo.id} className="relative aspect-video overflow-hidden rounded-lg">
+                      <div key={photo.id} className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border/60">
                         <Image
                           src={photo.url}
                           alt="Activity photo"
                           fill
-                          className="object-cover"
-                          sizes="(max-width: 768px) 50vw, 160px"
+                          className="object-cover transition duration-300 ease-out hover:scale-[1.02]"
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 360px"
                         />
                       </div>
                     ))}
