@@ -182,6 +182,11 @@ export function PotteryGallery({ projects, glazes, cones }: PotteryGalleryProps)
             setSelectedProjectId(null);
             setSelectedPhotoId(null);
           }}
+          onProjectDeleted={(projectId) => {
+            setProjectList((prev) => prev.filter((project) => project.id !== projectId));
+            setSelectedProjectId(null);
+            setSelectedPhotoId(null);
+          }}
           onActivitySaved={(activity: PotteryActivity) => {
             setProjectList((prev) => {
               const activeId = selectedProjectId;

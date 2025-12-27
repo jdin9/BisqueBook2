@@ -145,3 +145,107 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const { userId } = await auth();
+
+    if (!userId) {
+      return NextResponse.json({ error: "You must be signed in to delete a project." }, { status: 401 });
+    }
+
+    const body = await request.json().catch(() => null);
+    const projectId = (body?.projectId as string | null)?.trim();
+
+    if (!projectId) {
+      return NextResponse.json({ error: "A project ID is required to delete a project." }, { status: 400 });
+    }
+
+    const supabase = getSupabaseServiceRoleClient();
+    const bucket = await ensureStorageBucketExists(process.env.SUPABASE_STORAGE_BUCKET || "attachments");
+
+    const [{ data: projectPhotos, error: projectPhotosError }, { data: activityPhotos, error: activityPhotosError }] =
+      await Promise.all([
+        supabase.from("ProjectPhotos").select("storage_path").eq("project_id", projectId),
+        supabase.from("ActivityPhotos").select("storage_path").eq("project_id", projectId),
+      ]);
+
+    if (projectPhotosError || activityPhotosError) {
+      console.error("Failed to look up pottery photos for deletion", { projectPhotosError, activityPhotosError });
+      return NextResponse.json(
+        { error: "Unable to delete project photos. Try again or verify Supabase permissions." },
+        { status: 500 },
+      );
+    }
+
+    const storagePaths = Array.from(
+      new Set(
+        [...(projectPhotos || []), ...(activityPhotos || [])]
+          .map((photo) => photo.storage_path as string | null)
+          .filter(Boolean) as string[],
+      ),
+    );
+
+    if (storagePaths.length) {
+      const { error: storageError } = await supabase.storage.from(bucket).remove(storagePaths);
+
+      if (storageError) {
+        console.error("Failed to delete pottery storage objects", storageError);
+        return NextResponse.json(
+          { error: "Unable to delete project files from storage. Confirm bucket permissions." },
+          { status: 500 },
+        );
+      }
+    }
+
+    const { error: activityPhotosDeleteError } = await supabase.from("ActivityPhotos").delete().eq("project_id", projectId);
+
+    if (activityPhotosDeleteError) {
+      console.error("Failed to delete pottery activity photos", activityPhotosDeleteError);
+      return NextResponse.json(
+        { error: "Unable to delete activity photos for this project." },
+        { status: 500 },
+      );
+    }
+
+    const { error: projectPhotosDeleteError } = await supabase.from("ProjectPhotos").delete().eq("project_id", projectId);
+
+    if (projectPhotosDeleteError) {
+      console.error("Failed to delete pottery project photos", projectPhotosDeleteError);
+      return NextResponse.json(
+        { error: "Unable to delete photos attached to this project." },
+        { status: 500 },
+      );
+    }
+
+    const { error: activitiesDeleteError } = await supabase.from("Activities").delete().eq("project_id", projectId);
+
+    if (activitiesDeleteError) {
+      console.error("Failed to delete pottery activities", activitiesDeleteError);
+      return NextResponse.json(
+        { error: "Unable to delete activities for this project." },
+        { status: 500 },
+      );
+    }
+
+    const { error: projectDeleteError } = await supabase.from("Projects").delete().eq("id", projectId);
+
+    if (projectDeleteError) {
+      console.error("Failed to delete pottery project", projectDeleteError);
+      return NextResponse.json(
+        { error: "Unable to delete project record from Supabase." },
+        { status: 500 },
+      );
+    }
+
+    revalidatePath("/pottery");
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Unexpected error deleting pottery project", error);
+    return NextResponse.json(
+      { error: "Unexpected error deleting project. Verify Supabase environment variables and try again." },
+      { status: 500 },
+    );
+  }
+}
