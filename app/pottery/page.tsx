@@ -244,6 +244,9 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
     const storagePaths = Array.from(new Set(allPhotoRows.map((row) => row.storage_path)));
 
     const signedUrlLookup = new Map<string, string | null>();
+    type SignedUrlOptions = { download?: string | boolean; transform?: { format?: "origin" } };
+    const toWebpTransform = { transform: { format: "webp" } } as const;
+    const signedUrlTransform = toWebpTransform as unknown as SignedUrlOptions;
 
     if (storagePaths.length) {
       await Promise.all(
@@ -254,11 +257,7 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
 
           const { data, error } = await storageClient.storage
             .from(bucket)
-            .createSignedUrl(
-              path,
-              60 * 60 * 24 * 7,
-              needsTransform ? { transform: { format: "webp" } } : undefined,
-            );
+            .createSignedUrl(path, 60 * 60 * 24 * 7, needsTransform ? signedUrlTransform : undefined);
 
           if (error || !data?.signedUrl) {
             console.error("Failed to sign pottery photo", { path, error });
@@ -278,7 +277,7 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
       const signedUrl = signedUrlLookup.get(row.storage_path) || null;
       const { data } = storageClient.storage
         .from(bucket)
-        .getPublicUrl(row.storage_path, needsTransform ? { transform: { format: "webp" } } : undefined);
+        .getPublicUrl(row.storage_path, needsTransform ? signedUrlTransform : undefined);
       return {
         id: row.id,
         storagePath: row.storage_path,

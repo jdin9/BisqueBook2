@@ -197,6 +197,9 @@ export async function POST(request: Request) {
 
     const storagePaths = photoRows.map((row) => row.storage_path);
     const signedUrlLookup = new Map<string, string | null>();
+    type SignedUrlOptions = { download?: string | boolean; transform?: { format?: "origin" } };
+    const toWebpTransform = { transform: { format: "webp" } } as const;
+    const signedUrlTransform = toWebpTransform as unknown as SignedUrlOptions;
 
     if (storagePaths.length) {
       await Promise.all(
@@ -207,11 +210,7 @@ export async function POST(request: Request) {
 
           const { data, error } = await supabase.storage
             .from(bucket)
-            .createSignedUrl(
-              path,
-              60 * 60 * 24 * 7,
-              needsTransform ? { transform: { format: "webp" } } : undefined,
-            );
+            .createSignedUrl(path, 60 * 60 * 24 * 7, needsTransform ? signedUrlTransform : undefined);
 
           if (error || !data?.signedUrl) {
             console.error("Failed to generate activity photo URL", { path, error });
@@ -224,26 +223,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const missingSignedUrls = storagePaths.filter((path) => !signedUrlLookup.get(path));
-
-    if (missingSignedUrls.length) {
-      const missingSignatures = await Promise.all(
-        missingSignedUrls.map(async (path) => {
-          const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 60 * 60 * 24 * 7);
-          if (error || !data?.signedUrl) {
-            console.error("Failed to generate activity photo URL", { path, error });
-            return null;
-          }
-          return { path, signedUrl: data.signedUrl };
-        }),
-      );
-
-      missingSignatures.forEach((entry) => {
-        if (!entry) return;
-        signedUrlLookup.set(entry.path, entry.signedUrl);
-      });
-    }
-
     const toPhoto = (row: (typeof photoRows)[number]) => {
       const needsTransform = [".heic", ".heif", ".hevc", ".heix", ".heifs"].some((ext) =>
         row.storage_path.toLowerCase().endsWith(ext),
@@ -251,7 +230,7 @@ export async function POST(request: Request) {
       const signedUrl = signedUrlLookup.get(row.storage_path) || null;
       const { data: publicUrlData } = supabase.storage
         .from(bucket)
-        .getPublicUrl(row.storage_path, needsTransform ? { transform: { format: "webp" } } : undefined);
+        .getPublicUrl(row.storage_path, needsTransform ? signedUrlTransform : undefined);
       return {
         id: row.id,
         storagePath: row.storage_path,
