@@ -5,6 +5,17 @@ export type PotteryPhoto = {
   createdAt: string;
 };
 
+export type PotteryGlazeOption = {
+  id: string;
+  name: string;
+  brand?: string | null;
+};
+
+export type PotteryConeOption = {
+  cone: string;
+  temperature: string;
+};
+
 export type PotteryActivity = {
   id: string;
   type: "glaze" | "fire";

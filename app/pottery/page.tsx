@@ -3,7 +3,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AddProjectModal } from "@/components/pottery/add-project-modal";
 import { PotteryGallery } from "@/components/pottery/pottery-gallery";
-import { type PotteryProject } from "@/components/pottery/types";
+import { type PotteryConeOption, type PotteryGlazeOption, type PotteryProject } from "@/components/pottery/types";
 import { getSupabaseAnonClient, getSupabaseServiceRoleClient } from "@/lib/storage";
 import { WelcomeModal } from "@/components/welcome-modal";
 
@@ -13,8 +13,11 @@ export const revalidate = 0;
 export default async function PotteryPage() {
   const { projects, error } = await fetchPotteryProjects();
   const { clays } = await fetchActiveClays();
+  const { glazes, error: glazeError } = await fetchActiveGlazes();
+  const { cones, error: coneError } = await fetchCones();
   const user = await currentUser();
   const makerName = user ? user.fullName || [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username : null;
+  const errors = [error, glazeError, coneError].filter(Boolean);
 
   return (
     <div className="space-y-8">
@@ -33,9 +36,9 @@ export default async function PotteryPage() {
         </p>
       </div>
 
-      {error && (
+      {errors.length > 0 && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          {error}
+          {errors.join(" ")}
         </div>
       )}
 
@@ -49,7 +52,7 @@ export default async function PotteryPage() {
           </CardHeader>
         </Card>
       ) : (
-        <PotteryGallery projects={projects} />
+        <PotteryGallery projects={projects} glazes={glazes} cones={cones} />
       )}
     </div>
   );
@@ -106,6 +109,17 @@ type ProjectSelectRow =
 type ClayRow = {
   id: string;
   clay_body: string;
+};
+
+type GlazeRow = {
+  id: string;
+  glaze_name: string;
+  brand: string;
+};
+
+type ConeRow = {
+  cone: string;
+  temperature: string;
 };
 
 async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; error?: string }> {
@@ -342,5 +356,46 @@ async function fetchActiveClays(): Promise<{ clays: { id: string; name: string }
     return { clays };
   } catch {
     return { clays: [], error: "Unable to load clays." };
+  }
+}
+
+async function fetchActiveGlazes(): Promise<{ glazes: PotteryGlazeOption[]; error?: string }> {
+  try {
+    const supabase = getSupabaseAnonClient();
+    const { data, error } = await supabase
+      .from("Glazes")
+      .select("id, glaze_name, brand")
+      .eq("status", "active")
+      .order("glaze_name", { ascending: true });
+
+    if (error) {
+      return { glazes: [], error: "Unable to load glazes." };
+    }
+
+    const glazes = (data as GlazeRow[] | null)?.map((glaze) => ({
+      id: glaze.id,
+      name: glaze.glaze_name,
+      brand: glaze.brand,
+    })) ?? [];
+
+    return { glazes };
+  } catch {
+    return { glazes: [], error: "Unable to load glazes." };
+  }
+}
+
+async function fetchCones(): Promise<{ cones: PotteryConeOption[]; error?: string }> {
+  try {
+    const supabase = getSupabaseAnonClient();
+    const { data, error } = await supabase.from("Cones").select("cone, temperature").order("cone", { ascending: true });
+
+    if (error) {
+      return { cones: [], error: "Unable to load cones." };
+    }
+
+    const cones = (data as ConeRow[] | null)?.map((cone) => ({ cone: cone.cone, temperature: cone.temperature })) ?? [];
+    return { cones };
+  } catch {
+    return { cones: [], error: "Unable to load cones." };
   }
 }
