@@ -243,43 +243,42 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
     const allPhotoRows = [...((projectPhotoRows as ProjectPhotoRow[]) || []), ...((activityPhotoRows as ActivityPhotoRow[]) || [])];
     const storagePaths = Array.from(new Set(allPhotoRows.map((row) => row.storage_path)));
 
-    const { data: signedUrls, error: signedUrlError } = storagePaths.length
-      ? await storageClient.storage.from(bucket).createSignedUrls(storagePaths, 60 * 60 * 24 * 7)
-      : { data: null, error: null };
-
-    if (signedUrlError) {
-      return { projects: [], error: "Failed to generate photo links. Check Supabase storage permissions." };
-    }
-
     const signedUrlLookup = new Map<string, string | null>();
-    (signedUrls ?? []).forEach((signedUrl) => {
-      if (!signedUrl?.path) return;
-      signedUrlLookup.set(signedUrl.path, signedUrl.signedUrl ?? null);
-    });
 
-    const missingSignedUrls = storagePaths.filter((path) => !signedUrlLookup.get(path));
+    if (storagePaths.length) {
+      await Promise.all(
+        storagePaths.map(async (path) => {
+          const needsTransform = [".heic", ".heif", ".hevc", ".heix", ".heifs"].some((ext) =>
+            path.toLowerCase().endsWith(ext),
+          );
 
-    if (missingSignedUrls.length) {
-      const missingSignatures = await Promise.all(
-        missingSignedUrls.map(async (path) => {
-          const { data, error } = await storageClient.storage.from(bucket).createSignedUrl(path, 60 * 60 * 24 * 7);
+          const { data, error } = await storageClient.storage
+            .from(bucket)
+            .createSignedUrl(
+              path,
+              60 * 60 * 24 * 7,
+              needsTransform ? { transform: { format: "webp" } } : undefined,
+            );
+
           if (error || !data?.signedUrl) {
             console.error("Failed to sign pottery photo", { path, error });
-            return null;
+            signedUrlLookup.set(path, null);
+            return;
           }
-          return { path, signedUrl: data.signedUrl };
+
+          signedUrlLookup.set(path, data.signedUrl);
         }),
       );
-
-      missingSignatures.forEach((entry) => {
-        if (!entry) return;
-        signedUrlLookup.set(entry.path, entry.signedUrl);
-      });
     }
 
     const toPhoto = (row: ProjectPhotoRow | ActivityPhotoRow) => {
+      const needsTransform = [".heic", ".heif", ".hevc", ".heix", ".heifs"].some((ext) =>
+        row.storage_path.toLowerCase().endsWith(ext),
+      );
       const signedUrl = signedUrlLookup.get(row.storage_path) || null;
-      const { data } = storageClient.storage.from(bucket).getPublicUrl(row.storage_path);
+      const { data } = storageClient.storage
+        .from(bucket)
+        .getPublicUrl(row.storage_path, needsTransform ? { transform: { format: "webp" } } : undefined);
       return {
         id: row.id,
         storagePath: row.storage_path,
