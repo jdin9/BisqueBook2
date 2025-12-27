@@ -219,12 +219,28 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
       return { projects: [], error: "Failed to load activity photos. Confirm ActivityPhotos is accessible." };
     }
 
+    const allPhotoRows = [...((projectPhotoRows as ProjectPhotoRow[]) || []), ...((activityPhotoRows as ActivityPhotoRow[]) || [])];
+    const storagePaths = Array.from(new Set(allPhotoRows.map((row) => row.storage_path)));
+
+    const { data: signedUrls, error: signedUrlError } = storagePaths.length
+      ? await supabase.storage.from(bucket).createSignedUrls(storagePaths, 60 * 60 * 24 * 7)
+      : { data: null, error: null };
+
+    if (signedUrlError) {
+      return { projects: [], error: "Failed to generate photo links. Check Supabase storage permissions." };
+    }
+
+    const signedUrlLookup = new Map<string, string | null>(
+      (signedUrls ?? []).map((signedUrl) => [signedUrl.path, signedUrl.signedUrl]),
+    );
+
     const toPhoto = (row: ProjectPhotoRow | ActivityPhotoRow) => {
+      const signedUrl = signedUrlLookup.get(row.storage_path) || null;
       const { data } = supabase.storage.from(bucket).getPublicUrl(row.storage_path);
       return {
         id: row.id,
         storagePath: row.storage_path,
-        url: data.publicUrl,
+        url: signedUrl || data.publicUrl,
         createdAt: row.created_at,
       };
     };
