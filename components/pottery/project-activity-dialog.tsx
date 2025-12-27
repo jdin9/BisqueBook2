@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, Trash, X } from "lucide-react";
+import { Loader2, Minus, Plus, Trash, X } from "lucide-react";
 import { ActivityTimeline } from "@/components/pottery/activity-timeline";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +12,7 @@ import {
   type PotteryPhoto,
   type PotteryProject,
 } from "./types";
+import { formatConeLabel } from "./utils";
 
 type ProjectActivityDialogProps = {
   project: PotteryProject;
@@ -58,7 +59,7 @@ export function ProjectActivityDialog({
         label:
           activity.type === "glaze"
             ? `Glaze${activity.glazeName ? ` · ${activity.glazeName}` : ""}`
-            : `Fire${activity.cone ? ` · Cone ${activity.cone}` : ""}`,
+            : `Fire${activity.cone ? ` · ${formatConeLabel(activity.cone)}` : ""}`,
       })),
     );
 
@@ -376,15 +377,37 @@ export function ProjectActivityDialog({
 
                 <label className="space-y-2 text-sm block">
                   <span className="font-medium text-foreground">Layers</span>
-                  <input
-                    type="number"
-                    name="coats"
-                    min={1}
-                    value={coats}
-                    onChange={(event) => setCoats(Number.parseInt(event.target.value, 10) || 1)}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  />
-                  <p className="text-xs text-muted-foreground">Use the arrows to adjust how many coats were applied.</p>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCoats((current) => Math.max(1, current - 1))}
+                      aria-label="Decrease layers"
+                      className="flex h-10 w-10 items-center justify-center rounded-md border border-input bg-muted/60 text-muted-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                    >
+                      <Minus className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                    <input
+                      type="number"
+                      name="coats"
+                      min={1}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={coats}
+                      onChange={(event) => setCoats(Math.max(1, Number.parseInt(event.target.value, 10) || 1))}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setCoats((current) => current + 1)}
+                      aria-label="Increase layers"
+                      className="flex h-10 w-10 items-center justify-center rounded-md border border-input bg-muted/60 text-muted-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                    >
+                      <Plus className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Tap the buttons or enter the number of coats applied.
+                  </p>
                 </label>
               </div>
             ) : (
@@ -402,7 +425,7 @@ export function ProjectActivityDialog({
                   </option>
                   {cones.map((cone) => (
                     <option key={cone.cone} value={cone.cone}>
-                      Cone {cone.cone} — {cone.temperature}°F
+                      {formatConeLabel(cone.cone)} — {cone.temperature}°F
                     </option>
                   ))}
                 </select>

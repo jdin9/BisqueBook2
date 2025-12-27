@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
+import { formatConeLabel } from "./utils";
 import { type PotteryActivity } from "./types";
 
 type ActivityTimelineProps = {
@@ -44,7 +45,7 @@ export function ActivityTimeline({ activities }: ActivityTimelineProps) {
                   )}
                   {activity.type === "fire" && activity.cone && (
                     <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800">
-                      Cone {activity.cone}
+                      {formatConeLabel(activity.cone)}
                     </span>
                   )}
                   {activity.type === "fire" && activity.coneTemperature && (
