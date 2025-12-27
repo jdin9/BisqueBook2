@@ -16,7 +16,7 @@ import { WelcomeModal } from "@/components/welcome-modal";
 const features = [
   {
     title: "Secure by default",
-    description: "Clerk middleware protection for sensitive routes, out-of-the-box multi-user auth, and prebuilt flows.",
+    description: "Clerk proxy protection for sensitive routes, out-of-the-box multi-user auth, and prebuilt flows.",
     icon: ShieldCheck,
   },
   {
