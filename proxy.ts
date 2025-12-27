@@ -1,4 +1,4 @@
-import type { NextRequest } from "next/server";
+import type { NextFetchEvent, NextRequest } from "next/server";
 
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
@@ -10,8 +10,8 @@ const proxyHandler = clerkMiddleware((auth, req) => {
   }
 });
 
-export function proxy(request: NextRequest) {
-  return proxyHandler(request);
+export function proxy(request: NextRequest, event: NextFetchEvent) {
+  return proxyHandler(request, event);
 }
 
 export const config = {
