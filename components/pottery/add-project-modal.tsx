@@ -57,32 +57,43 @@ export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
                 event.preventDefault();
                 setState({ status: "submitting" });
 
-                const formData = new FormData(event.currentTarget);
+                const formElement = event.currentTarget;
+                const formData = new FormData(formElement);
+
                 if (!makerName) {
                   setState({ status: "error", message: "Sign in to create a project." });
                   return;
                 }
-                formData.set("makerName", makerName);
 
-                const response = await fetch("/api/pottery/projects", {
-                  method: "POST",
-                  body: formData,
-                });
+                try {
+                  formData.set("makerName", makerName);
 
-                if (!response.ok) {
-                  const result = (await response.json().catch(() => null)) as { error?: string } | null;
+                  const response = await fetch("/api/pottery/projects", {
+                    method: "POST",
+                    body: formData,
+                  });
+
+                  if (!response.ok) {
+                    const result = (await response.json().catch(() => null)) as { error?: string } | null;
+                    setState({
+                      status: "error",
+                      message: result?.error || "Unable to save project. Please try again.",
+                    });
+                    return;
+                  }
+
+                  formElement.reset();
+                  setPhotoCount(0);
+                  setState({ status: "success" });
+                  setOpen(false);
+                  router.refresh();
+                } catch (error) {
+                  console.error("Failed to save pottery project", error);
                   setState({
                     status: "error",
-                    message: result?.error || "Unable to save project. Please try again.",
+                    message: "Unexpected error while saving. Please try again.",
                   });
-                  return;
                 }
-
-                event.currentTarget.reset();
-                setPhotoCount(0);
-                setState({ status: "success" });
-                setOpen(false);
-                router.refresh();
               }}
             >
               <div className="grid gap-4 md:grid-cols-2">
