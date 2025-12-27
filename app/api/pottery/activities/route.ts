@@ -196,19 +196,42 @@ export async function POST(request: Request) {
     }
 
     const storagePaths = photoRows.map((row) => row.storage_path);
-    const { data: signedUrls } = storagePaths.length
-      ? await supabase.storage.from(bucket).createSignedUrls(storagePaths, 60 * 60 * 24 * 7)
-      : { data: [] as { path: string | null; signedUrl: string | null }[] };
-
     const signedUrlLookup = new Map<string, string | null>();
-    (signedUrls ?? []).forEach((signedUrl) => {
-      if (!signedUrl?.path) return;
-      signedUrlLookup.set(signedUrl.path, signedUrl.signedUrl ?? null);
-    });
+
+    if (storagePaths.length) {
+      await Promise.all(
+        storagePaths.map(async (path) => {
+          const needsTransform = [".heic", ".heif", ".hevc", ".heix", ".heifs"].some((ext) =>
+            path.toLowerCase().endsWith(ext),
+          );
+
+          const { data, error } = await supabase.storage
+            .from(bucket)
+            .createSignedUrl(
+              path,
+              60 * 60 * 24 * 7,
+              needsTransform ? { transform: { format: "webp" } } : undefined,
+            );
+
+          if (error || !data?.signedUrl) {
+            console.error("Failed to generate activity photo URL", { path, error });
+            signedUrlLookup.set(path, null);
+            return;
+          }
+
+          signedUrlLookup.set(path, data.signedUrl);
+        }),
+      );
+    }
 
     const toPhoto = (row: (typeof photoRows)[number]) => {
+      const needsTransform = [".heic", ".heif", ".hevc", ".heix", ".heifs"].some((ext) =>
+        row.storage_path.toLowerCase().endsWith(ext),
+      );
       const signedUrl = signedUrlLookup.get(row.storage_path) || null;
-      const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(row.storage_path);
+      const { data: publicUrlData } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(row.storage_path, needsTransform ? { transform: { format: "webp" } } : undefined);
       return {
         id: row.id,
         storagePath: row.storage_path,
