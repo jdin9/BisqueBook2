@@ -206,6 +206,26 @@ export async function POST(request: Request) {
       signedUrlLookup.set(signedUrl.path, signedUrl.signedUrl ?? null);
     });
 
+    const missingSignedUrls = storagePaths.filter((path) => !signedUrlLookup.get(path));
+
+    if (missingSignedUrls.length) {
+      const missingSignatures = await Promise.all(
+        missingSignedUrls.map(async (path) => {
+          const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 60 * 60 * 24 * 7);
+          if (error || !data?.signedUrl) {
+            console.error("Failed to generate activity photo URL", { path, error });
+            return null;
+          }
+          return { path, signedUrl: data.signedUrl };
+        }),
+      );
+
+      missingSignatures.forEach((entry) => {
+        if (!entry) return;
+        signedUrlLookup.set(entry.path, entry.signedUrl);
+      });
+    }
+
     const toPhoto = (row: (typeof photoRows)[number]) => {
       const signedUrl = signedUrlLookup.get(row.storage_path) || null;
       const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(row.storage_path);

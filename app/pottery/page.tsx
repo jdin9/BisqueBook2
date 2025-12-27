@@ -257,6 +257,26 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
       signedUrlLookup.set(signedUrl.path, signedUrl.signedUrl ?? null);
     });
 
+    const missingSignedUrls = storagePaths.filter((path) => !signedUrlLookup.get(path));
+
+    if (missingSignedUrls.length) {
+      const missingSignatures = await Promise.all(
+        missingSignedUrls.map(async (path) => {
+          const { data, error } = await storageClient.storage.from(bucket).createSignedUrl(path, 60 * 60 * 24 * 7);
+          if (error || !data?.signedUrl) {
+            console.error("Failed to sign pottery photo", { path, error });
+            return null;
+          }
+          return { path, signedUrl: data.signedUrl };
+        }),
+      );
+
+      missingSignatures.forEach((entry) => {
+        if (!entry) return;
+        signedUrlLookup.set(entry.path, entry.signedUrl);
+      });
+    }
+
     const toPhoto = (row: ProjectPhotoRow | ActivityPhotoRow) => {
       const signedUrl = signedUrlLookup.get(row.storage_path) || null;
       const { data } = storageClient.storage.from(bucket).getPublicUrl(row.storage_path);
