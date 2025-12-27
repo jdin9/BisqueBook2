@@ -4,24 +4,12 @@ import { type PotteryProject } from "./types";
 
 type ProjectCardProps = {
   project: PotteryProject;
-  isSelected: boolean;
-  onSelect: () => void;
 };
 
-export function ProjectCard({ project, isSelected, onSelect }: ProjectCardProps) {
+export function ProjectCard({ project }: ProjectCardProps) {
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={`group text-left transition ${
-        isSelected ? "scale-[1.02] brightness-100" : "brightness-100 hover:brightness-105"
-      }`}
-    >
-      <Card
-        className={`overflow-hidden border transition ${
-          isSelected ? "border-primary shadow-lg shadow-primary/10" : "border-border/60"
-        }`}
-      >
+    <div className="group text-left transition brightness-100 hover:brightness-105">
+      <Card className="overflow-hidden border border-border/60 transition">
         <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200">
           {project.thumbnailUrl ? (
             <Image
@@ -30,7 +18,6 @@ export function ProjectCard({ project, isSelected, onSelect }: ProjectCardProps)
               fill
               className="object-cover transition duration-500 group-hover:scale-105"
               sizes="(max-width: 768px) 50vw, 280px"
-              priority={isSelected}
             />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -80,6 +67,6 @@ export function ProjectCard({ project, isSelected, onSelect }: ProjectCardProps)
           </div>
         </div>
       </Card>
-    </button>
+    </div>
   );
 }
