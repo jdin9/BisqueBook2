@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, X } from "lucide-react";
+import { Loader2, Plus, Trash, X } from "lucide-react";
 import { ActivityTimeline } from "@/components/pottery/activity-timeline";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +20,7 @@ type ProjectActivityDialogProps = {
   initialPhotoId?: string | null;
   onClose: () => void;
   onActivitySaved: (activity: PotteryActivity) => void;
+  onProjectDeleted: (projectId: string) => void;
 };
 
 type SubmitState = {
@@ -36,12 +37,14 @@ export function ProjectActivityDialog({
   initialPhotoId,
   onClose,
   onActivitySaved,
+  onProjectDeleted,
 }: ProjectActivityDialogProps) {
   const [activePhotoId, setActivePhotoId] = useState<string | null>(initialPhotoId ?? null);
   const [activityType, setActivityType] = useState<"glaze" | "fire">("glaze");
   const [coats, setCoats] = useState(1);
   const [photoCount, setPhotoCount] = useState(0);
   const [state, setState] = useState<SubmitState>({ status: "idle" });
+  const [deleteState, setDeleteState] = useState<SubmitState>({ status: "idle" });
 
   const allPhotos = useMemo<DisplayPhoto[]>(() => {
     const projectPhotos = project.projectPhotos.map((photo) => ({
@@ -179,6 +182,77 @@ export function ProjectActivityDialog({
             </div>
             <div className="pt-3">
               <ActivityTimeline activities={project.activities} />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold text-destructive">Delete project</p>
+                <p className="text-xs text-destructive/80">
+                  Remove this project and all related activities and photos from the pottery log.
+                </p>
+              </div>
+              {deleteState.status === "error" && deleteState.message ? (
+                <p className="text-xs font-medium text-destructive">{deleteState.message}</p>
+              ) : null}
+            </div>
+            <div className="pt-3 text-right">
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={deleteState.status === "submitting"}
+                onClick={async () => {
+                  const confirmed = window.confirm(
+                    "Are you sure you want to delete this project? This will remove all activities and photos.",
+                  );
+
+                  if (!confirmed) return;
+
+                  setDeleteState({ status: "submitting" });
+
+                  try {
+                    const response = await fetch("/api/pottery/projects", {
+                      method: "DELETE",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ projectId: project.id }),
+                    });
+
+                    const result = (await response.json().catch(() => null)) as { error?: string } | null;
+
+                    if (!response.ok) {
+                      setDeleteState({
+                        status: "error",
+                        message: result?.error || "Failed to delete the project. Please try again.",
+                      });
+                      return;
+                    }
+
+                    onProjectDeleted(project.id);
+                    onClose();
+                  } catch (error) {
+                    console.error("Failed to delete pottery project", error);
+                    setDeleteState({
+                      status: "error",
+                      message: "Unexpected error while deleting. Please try again.",
+                    });
+                  } finally {
+                    setDeleteState((prev) => (prev.status === "error" ? prev : { status: "idle" }));
+                  }
+                }}
+              >
+                {deleteState.status === "submitting" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash className="h-4 w-4" />
+                    Delete project
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </div>
