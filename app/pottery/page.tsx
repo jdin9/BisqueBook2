@@ -230,9 +230,11 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
       return { projects: [], error: "Failed to generate photo links. Check Supabase storage permissions." };
     }
 
-    const signedUrlLookup = new Map<string, string | null>(
-      (signedUrls ?? []).map((signedUrl) => [signedUrl.path, signedUrl.signedUrl]),
-    );
+    const signedUrlLookup = new Map<string, string | null>();
+    (signedUrls ?? []).forEach((signedUrl) => {
+      if (!signedUrl?.path) return;
+      signedUrlLookup.set(signedUrl.path, signedUrl.signedUrl ?? null);
+    });
 
     const toPhoto = (row: ProjectPhotoRow | ActivityPhotoRow) => {
       const signedUrl = signedUrlLookup.get(row.storage_path) || null;
