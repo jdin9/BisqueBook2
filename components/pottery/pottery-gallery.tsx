@@ -1,30 +1,54 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ProjectActivityDialog } from "./project-activity-dialog";
 import { ProjectCard } from "./project-card";
-import { type PotteryProject } from "./types";
+import {
+  type PotteryConeOption,
+  type PotteryGlazeOption,
+  type PotteryActivity,
+  type PotteryProject,
+} from "./types";
 
-type GalleryPhoto = PotteryProject["projectPhotos"][number] & { projectTitle: string };
+type GalleryPhoto = PotteryProject["projectPhotos"][number] & {
+  projectId: string;
+  projectTitle: string;
+  activityId?: string | null;
+};
 
 type PotteryGalleryProps = {
   projects: PotteryProject[];
+  glazes: PotteryGlazeOption[];
+  cones: PotteryConeOption[];
 };
 
-export function PotteryGallery({ projects }: PotteryGalleryProps) {
+export function PotteryGallery({ projects, glazes, cones }: PotteryGalleryProps) {
+  const [projectList, setProjectList] = useState<PotteryProject[]>(projects);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
+  const activeProject = selectedProjectId ? projectList.find((project) => project.id === selectedProjectId) : null;
+
+  useEffect(() => {
+    setProjectList(projects);
+  }, [projects]);
+
   const galleryPhotos = useMemo<GalleryPhoto[]>(() => {
-    const photos: GalleryPhoto[] = projects.flatMap((project) => [
+    const photos: GalleryPhoto[] = projectList.flatMap((project) => [
       ...project.projectPhotos.map((photo) => ({
         ...photo,
+        projectId: project.id,
         projectTitle: project.title,
       })),
       ...project.activities.flatMap((activity) =>
         activity.photos.map((photo) => ({
           ...photo,
+          projectId: project.id,
           projectTitle: project.title,
+          activityId: activity.id,
         })),
       ),
     ]);
@@ -37,7 +61,7 @@ export function PotteryGallery({ projects }: PotteryGalleryProps) {
         return true;
       })
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }, [projects]);
+  }, [projectList]);
 
   const [activeIndex, setActiveIndex] = useState(0);
   const photoCount = galleryPhotos.length;
@@ -81,9 +105,14 @@ export function PotteryGallery({ projects }: PotteryGalleryProps) {
                   const opacity = opacityMap[depth] ?? 0.35;
 
                   return (
-                    <div
+                    <button
                       key={`${photo.id}-${offset}`}
-                      className="relative aspect-[4/3] w-full max-w-md shrink-0 transition-all duration-500 ease-out md:max-w-lg"
+                      type="button"
+                      onClick={() => {
+                        setSelectedProjectId(photo.projectId);
+                        setSelectedPhotoId(photo.id);
+                      }}
+                      className="relative aspect-[4/3] w-full max-w-md shrink-0 transition-all duration-500 ease-out md:max-w-lg focus:outline-none"
                       style={{
                         transform: `scale(${scale})`,
                         opacity,
@@ -103,7 +132,7 @@ export function PotteryGallery({ projects }: PotteryGalleryProps) {
                           priority={isCenter}
                         />
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -127,13 +156,64 @@ export function PotteryGallery({ projects }: PotteryGalleryProps) {
           <h2 className="text-xl font-semibold">Projects</h2>
           <p className="text-sm text-muted-foreground">Browse clay bodies, glazes, and firing details.</p>
         </div>
-        <span className="text-sm text-muted-foreground">{projects.length} active</span>
+        <span className="text-sm text-muted-foreground">{projectList.length} active</span>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {projects.map((project) => (
-          <ProjectCard key={project.id} project={project} />
+        {projectList.map((project) => (
+          <ProjectCard
+            key={project.id}
+            project={project}
+            onSelect={() => {
+              setSelectedProjectId(project.id);
+              const firstPhoto = project.projectPhotos[0] || project.activities.flatMap((activity) => activity.photos)[0];
+              setSelectedPhotoId(firstPhoto?.id ?? null);
+            }}
+          />
         ))}
       </div>
+
+      {activeProject && (
+        <ProjectActivityDialog
+          project={activeProject}
+          glazes={glazes}
+          cones={cones}
+          initialPhotoId={selectedPhotoId}
+          onClose={() => {
+            setSelectedProjectId(null);
+            setSelectedPhotoId(null);
+          }}
+          onActivitySaved={(activity: PotteryActivity) => {
+            setProjectList((prev) => {
+              const activeId = selectedProjectId;
+              if (!activeId) return prev;
+
+              const updated = prev.map((project) => {
+                if (project.id !== activeId) return project;
+
+                const updatedGlazes =
+                  activity.type === "glaze" && activity.glazeName
+                    ? Array.from(new Set([...project.glazesUsed, activity.glazeName]))
+                    : project.glazesUsed;
+
+                const activities = [...project.activities, activity].sort(
+                  (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+                );
+
+                return {
+                  ...project,
+                  activities,
+                  glazesUsed: updatedGlazes,
+                  updatedAt: activity.createdAt,
+                };
+              });
+
+              return [...updated].sort(
+                (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+              );
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -4,11 +4,16 @@ import { type PotteryProject } from "./types";
 
 type ProjectCardProps = {
   project: PotteryProject;
+  onSelect?: () => void;
 };
 
-export function ProjectCard({ project }: ProjectCardProps) {
+export function ProjectCard({ project, onSelect }: ProjectCardProps) {
   return (
-    <div className="group text-left transition brightness-100 hover:brightness-105">
+    <button
+      type="button"
+      onClick={onSelect}
+      className="group w-full text-left transition brightness-100 hover:brightness-105 focus:outline-none"
+    >
       <Card className="overflow-hidden border border-border/60 transition">
         <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200">
           {project.thumbnailUrl ? (
@@ -67,6 +72,6 @@ export function ProjectCard({ project }: ProjectCardProps) {
           </div>
         </div>
       </Card>
-    </div>
+    </button>
   );
 }
