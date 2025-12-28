@@ -105,6 +105,9 @@ export function ProjectActivityDialog({
               <p className="font-medium text-foreground">
                 {new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(project.createdAt))}
               </p>
+              <p className="mt-1 text-[11px]">
+                Maker: <span className="font-medium text-foreground">{project.makerName}</span>
+              </p>
             </div>
           </div>
 
