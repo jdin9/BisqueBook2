@@ -221,14 +221,23 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
             }
 
             const metadata = data.user.user_metadata as Record<string, unknown> | null;
+            const rawMetadata = (data.user.raw_user_meta_data as Record<string, unknown> | null) ?? null;
             const firstName =
               metadata && typeof metadata.first_name === "string" ? metadata.first_name : undefined;
             const lastName = metadata && typeof metadata.last_name === "string" ? metadata.last_name : undefined;
-            const fullNameFromParts = [firstName, lastName].filter(Boolean).join(" ");
+            const rawFirst =
+              rawMetadata && typeof rawMetadata.first_name === "string" ? rawMetadata.first_name : undefined;
+            const rawLast =
+              rawMetadata && typeof rawMetadata.last_name === "string" ? rawMetadata.last_name : undefined;
+
+            const fullNameFromParts = [firstName || rawFirst, lastName || rawLast].filter(Boolean).join(" ").trim();
             const name =
               fullNameFromParts ||
               (metadata && typeof metadata.name === "string" ? metadata.name : undefined) ||
-              makerId;
+              (rawMetadata && typeof rawMetadata.name === "string" ? rawMetadata.name : undefined) ||
+              (rawMetadata && typeof rawMetadata.full_name === "string" ? rawMetadata.full_name : undefined) ||
+              (data.user.email && typeof data.user.email === "string" ? data.user.email : undefined) ||
+              "Unknown maker";
 
             makerLookup.set(makerId, name);
           } catch (lookupError) {
