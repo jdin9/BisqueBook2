@@ -140,6 +140,7 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
         title: row.title,
         notes: row.notes,
         clay_id: row.clay_id,
+        user_id: row.user_id,
         created_at: row.created_at,
         updated_at: row.updated_at,
         clay,
