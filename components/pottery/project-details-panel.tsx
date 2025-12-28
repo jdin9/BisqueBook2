@@ -28,9 +28,15 @@ export function ProjectDetailsPanel({ project }: ProjectDetailsPanelProps) {
               <CardTitle className="text-xl">{project.title}</CardTitle>
               <p className="text-sm text-muted-foreground">Clay body: {project.clayBody}</p>
             </div>
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">
-              {new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(project.createdAt))}
-            </span>
+            <div className="text-right text-xs text-muted-foreground">
+              <p className="uppercase tracking-wide">Created</p>
+              <p className="font-medium text-foreground">
+                {new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(project.createdAt))}
+              </p>
+              <p className="mt-1 text-[11px]">
+                Maker: <span className="font-medium text-foreground">{project.makerName}</span>
+              </p>
+            </div>
           </div>
           {project.notes && <CardDescription className="pt-1 text-base text-foreground">{project.notes}</CardDescription>}
         </CardHeader>
