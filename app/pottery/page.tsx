@@ -15,7 +15,7 @@ export default async function PotteryPage() {
   const { cones, error: coneError } = await fetchCones();
   const user = await currentUser();
   const makerName = user ? user.fullName || [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username : null;
-  const errors = [error, glazeError, coneError].filter(Boolean);
+  const errors = [error, glazeError, coneError].filter((value): value is string => Boolean(value));
 
   return (
     <div className="space-y-8">
