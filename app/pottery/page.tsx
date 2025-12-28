@@ -9,7 +9,6 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function PotteryPage() {
-  const { projects, error } = await fetchPotteryProjects();
   const { activeClays, allClays } = await fetchClays();
   const { activeGlazes, allGlazes, error: glazeError } = await fetchGlazesWithStatus();
   const { cones, error: coneError } = await fetchCones();
@@ -18,6 +17,10 @@ export default async function PotteryPage() {
   const makerName = user
     ? user.fullName || [user.firstName, user.lastName].filter(Boolean).join(" ") || safeUsername || null
     : null;
+  const { projects, error } = await fetchPotteryProjects({
+    clerkUserId: user?.id ?? null,
+    makerName,
+  });
   const errors = [error, glazeError, coneError].filter((value): value is string => Boolean(value));
 
   return (
@@ -104,7 +107,12 @@ type ConeRow = {
   temperature: string;
 };
 
-async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; error?: string }> {
+type CurrentMaker = {
+  clerkUserId: string | null;
+  makerName: string | null;
+};
+
+async function fetchPotteryProjects(currentMaker: CurrentMaker): Promise<{ projects: PotteryProject[]; error?: string }> {
   try {
     noStore();
 
@@ -157,6 +165,23 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
 
     const projectIds = typedProjects.map((project) => project.id);
     const makerIds = Array.from(new Set(typedProjects.map((project) => project.user_id)));
+    const makerLookup = new Map<string, string>();
+    let currentMakerSupabaseId: string | null = null;
+
+    if (currentMaker.clerkUserId) {
+      try {
+        const { data, error } = await storageClient.auth.admin.getUserByExternalId(currentMaker.clerkUserId);
+
+        if (!error && data?.user) {
+          currentMakerSupabaseId = data.user.id;
+          if (currentMaker.makerName) {
+            makerLookup.set(data.user.id, currentMaker.makerName);
+          }
+        }
+      } catch (lookupError) {
+        console.error("Unable to resolve Supabase user for current maker", lookupError);
+      }
+    }
 
     const [{ data: projectPhotoRows, error: projectPhotoError }, { data: activityRows, error: activityError }] =
       await Promise.all([
@@ -211,11 +236,13 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
       };
     });
 
-    const makerLookup = new Map<string, string>();
-
     if (makerIds.length) {
       await Promise.all(
         makerIds.map(async (makerId) => {
+          if (makerLookup.has(makerId)) {
+            return;
+          }
+
           try {
             const { data, error } = await storageClient.auth.admin.getUserById(makerId);
 
@@ -231,6 +258,15 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
             const clerkUserId = metadata && typeof metadata.clerkUserId === "string" ? metadata.clerkUserId : undefined;
 
             let name: string | undefined;
+
+            if (currentMakerSupabaseId && makerId === currentMakerSupabaseId && currentMaker.makerName) {
+              makerLookup.set(makerId, currentMaker.makerName);
+              return;
+            }
+
+            if (clerkUserId && currentMaker.clerkUserId && clerkUserId === currentMaker.clerkUserId) {
+              name = currentMaker.makerName ?? undefined;
+            }
 
             if (clerkUserId) {
               try {
