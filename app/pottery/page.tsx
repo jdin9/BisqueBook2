@@ -1,10 +1,8 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { clerkClient, currentUser } from "@clerk/nextjs/server";
 import { unstable_noStore as noStore } from "next/cache";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AddProjectModal } from "@/components/pottery/add-project-modal";
-import { PotteryGallery } from "@/components/pottery/pottery-gallery";
-import { type PotteryConeOption, type PotteryGlazeOption, type PotteryProject } from "@/components/pottery/types";
+import { type PotteryConeOption, type PotteryGlazeFilterOption, type PotteryGlazeOption, type PotteryProject } from "@/components/pottery/types";
 import { getSupabaseAnonClient, getSupabaseServiceRoleClient } from "@/lib/storage";
+import { PotteryPageClient } from "@/components/pottery/pottery-page-client";
 import { WelcomeModal } from "@/components/welcome-modal";
 
 export const dynamic = "force-dynamic";
@@ -12,48 +10,29 @@ export const revalidate = 0;
 
 export default async function PotteryPage() {
   const { projects, error } = await fetchPotteryProjects();
-  const { clays } = await fetchActiveClays();
-  const { glazes, error: glazeError } = await fetchActiveGlazes();
+  const { activeClays, allClays } = await fetchClays();
+  const { activeGlazes, allGlazes, error: glazeError } = await fetchGlazesWithStatus();
   const { cones, error: coneError } = await fetchCones();
   const user = await currentUser();
-  const makerName = user ? user.fullName || [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username : null;
-  const errors = [error, glazeError, coneError].filter(Boolean);
+  const safeUsername = user?.username && !user.username.includes("@") ? user.username : undefined;
+  const makerName = user
+    ? user.fullName || [user.firstName, user.lastName].filter(Boolean).join(" ") || safeUsername || null
+    : null;
+  const errors = [error, glazeError, coneError].filter((value): value is string => Boolean(value));
 
   return (
     <div className="space-y-8">
       <WelcomeModal />
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm text-muted-foreground">Community-wide record</p>
-            <h1 className="text-3xl font-semibold">Pottery projects</h1>
-          </div>
-          <AddProjectModal clays={clays} makerName={makerName} />
-        </div>
-        <p className="text-muted-foreground">
-          Browse active projects, materials, and kiln history pulled directly from the Supabase tables that power the
-          pottery log.
-        </p>
-      </div>
-
-      {errors.length > 0 && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          {errors.join(" ")}
-        </div>
-      )}
-
-      {projects.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No projects available</CardTitle>
-            <CardDescription>
-              Projects will appear here as soon as makers create them in Supabase under the Projects table.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      ) : (
-        <PotteryGallery projects={projects} glazes={glazes} cones={cones} />
-      )}
+      <PotteryPageClient
+        projects={projects}
+        activeGlazes={activeGlazes}
+        allGlazes={allGlazes}
+        cones={cones}
+        clays={activeClays}
+        allClays={allClays}
+        makerName={makerName}
+        errors={errors}
+      />
     </div>
   );
 }
@@ -63,6 +42,7 @@ type ProjectRow = {
   title: string;
   notes: string | null;
   clay_id: string;
+  user_id: string;
   created_at: string;
   updated_at: string;
   clay: {
@@ -109,12 +89,14 @@ type ProjectSelectRow =
 type ClayRow = {
   id: string;
   clay_body: string;
+  status: string | null;
 };
 
 type GlazeRow = {
   id: string;
   glaze_name: string;
   brand: string;
+  status: string | null;
 };
 
 type ConeRow = {
@@ -129,6 +111,7 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
     const supabase = getSupabaseAnonClient();
     const storageClient = getSupabaseServiceRoleClient();
     const bucket = process.env.SUPABASE_STORAGE_BUCKET || "attachments";
+    const clerk = await clerkClient();
 
     const { data: projectRows, error: projectError } = await supabase
       .from("Projects")
@@ -138,6 +121,7 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
         title,
         notes,
         clay_id,
+        user_id,
         created_at,
         updated_at,
         clay:Clays ( clay_body )
@@ -160,6 +144,7 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
         title: row.title,
         notes: row.notes,
         clay_id: row.clay_id,
+        user_id: row.user_id,
         created_at: row.created_at,
         updated_at: row.updated_at,
         clay,
@@ -171,6 +156,7 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
     }
 
     const projectIds = typedProjects.map((project) => project.id);
+    const makerIds = Array.from(new Set(typedProjects.map((project) => project.user_id)));
 
     const [{ data: projectPhotoRows, error: projectPhotoError }, { data: activityRows, error: activityError }] =
       await Promise.all([
@@ -192,9 +178,9 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
             cone,
             notes,
             created_at,
-            glaze:Glazes ( glaze_name ),
-            coneRef:Cones ( cone, temperature )
-          `,
+        glaze:Glazes ( glaze_name ),
+        coneRef:Cones ( cone, temperature )
+      `,
           )
           .eq("archived", false)
           .in("project_id", projectIds)
@@ -224,6 +210,58 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
         coneRef,
       };
     });
+
+    const makerLookup = new Map<string, string>();
+
+    if (makerIds.length) {
+      await Promise.all(
+        makerIds.map(async (makerId) => {
+          try {
+            const { data, error } = await storageClient.auth.admin.getUserById(makerId);
+
+            if (error || !data?.user) {
+              console.error("Unable to load maker name", { makerId, error });
+              return;
+            }
+
+            const metadata = data.user.user_metadata as Record<string, unknown> | null;
+            const firstName = metadata && typeof metadata.first_name === "string" ? metadata.first_name : undefined;
+            const lastName = metadata && typeof metadata.last_name === "string" ? metadata.last_name : undefined;
+            const fullNameFromParts = [firstName, lastName].filter(Boolean).join(" ").trim();
+            const clerkUserId = metadata && typeof metadata.clerkUserId === "string" ? metadata.clerkUserId : undefined;
+
+            let name: string | undefined;
+
+            if (clerkUserId) {
+              try {
+                const clerkUser = await clerk.users.getUser(clerkUserId);
+                const safeClerkUsername =
+                  clerkUser.username && !clerkUser.username.includes("@") ? clerkUser.username : undefined;
+                name =
+                  [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ").trim() ||
+                  clerkUser.fullName ||
+                  safeClerkUsername ||
+                  undefined;
+              } catch (clerkError) {
+                console.error("Unable to load maker name from Clerk", { makerId, clerkUserId, error: clerkError });
+              }
+            }
+
+            if (!name) {
+              name =
+                fullNameFromParts ||
+                (metadata && typeof metadata.full_name === "string" ? metadata.full_name : undefined) ||
+                (metadata && typeof metadata.name === "string" ? metadata.name : undefined) ||
+                undefined;
+            }
+
+            makerLookup.set(makerId, name || "Unknown maker");
+          } catch (lookupError) {
+            console.error("Unexpected maker lookup failure", lookupError);
+          }
+        }),
+      );
+    }
 
     const activityIds = typedActivities.map((activity) => activity.id);
 
@@ -314,6 +352,7 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
         id: activity.id,
         type: activity.type,
         notes: activity.notes,
+        glazeId: activity.glaze_id,
         glazeName: activity.glaze?.glaze_name || undefined,
         coats: activity.coats,
         cone: activity.cone,
@@ -330,17 +369,29 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
         ),
       );
 
+      const glazeIdsUsed = Array.from(
+        new Set(
+          activities
+            .filter((activity) => activity.type === "glaze" && activity.glazeId)
+            .map((activity) => activity.glazeId as string),
+        ),
+      );
+
       const thumbnailUrl = projectPhotos[0]?.url ?? null;
 
       return {
         id: project.id,
         title: project.title,
         notes: project.notes,
+        clayId: project.clay_id,
         clayBody: project.clay?.clay_body || "Unknown clay body",
+        makerId: project.user_id,
+        makerName: makerLookup.get(project.user_id) || "Unknown maker",
         createdAt: project.created_at,
         updatedAt: project.updated_at,
         thumbnailUrl,
         glazesUsed,
+        glazeIdsUsed,
         projectPhotos,
         activities,
       };
@@ -356,48 +407,49 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
   }
 }
 
-async function fetchActiveClays(): Promise<{ clays: { id: string; name: string }[]; error?: string }> {
+async function fetchClays(): Promise<{ activeClays: { id: string; name: string }[]; allClays: { id: string; name: string; status?: string | null }[]; error?: string }> {
   try {
     const supabase = getSupabaseAnonClient();
-    const { data, error } = await supabase
-      .from("Clays")
-      .select("id, clay_body")
-      .eq("status", "active")
-      .order("clay_body", { ascending: true });
+    const { data, error } = await supabase.from("Clays").select("id, clay_body, status").order("clay_body", { ascending: true });
 
     if (error) {
-      return { clays: [], error: "Unable to load clays." };
+      return { activeClays: [], allClays: [], error: "Unable to load clays." };
     }
 
-    const clays = (data as ClayRow[] | null)?.map((clay) => ({ id: clay.id, name: clay.clay_body })) ?? [];
-    return { clays };
+    const allClays =
+      (data as ClayRow[] | null)?.map((clay) => ({ id: clay.id, name: clay.clay_body, status: clay.status })) ?? [];
+    const activeClays = allClays.filter((clay) => clay.status === "active");
+    return { activeClays, allClays };
   } catch {
-    return { clays: [], error: "Unable to load clays." };
+    return { activeClays: [], allClays: [], error: "Unable to load clays." };
   }
 }
 
-async function fetchActiveGlazes(): Promise<{ glazes: PotteryGlazeOption[]; error?: string }> {
+async function fetchGlazesWithStatus(): Promise<{ activeGlazes: PotteryGlazeOption[]; allGlazes: PotteryGlazeFilterOption[]; error?: string }> {
   try {
     const supabase = getSupabaseAnonClient();
     const { data, error } = await supabase
       .from("Glazes")
-      .select("id, glaze_name, brand")
-      .eq("status", "active")
+      .select("id, glaze_name, brand, status")
       .order("glaze_name", { ascending: true });
 
     if (error) {
-      return { glazes: [], error: "Unable to load glazes." };
+      return { activeGlazes: [], allGlazes: [], error: "Unable to load glazes." };
     }
 
-    const glazes = (data as GlazeRow[] | null)?.map((glaze) => ({
-      id: glaze.id,
-      name: glaze.glaze_name,
-      brand: glaze.brand,
-    })) ?? [];
+    const glazes =
+      (data as GlazeRow[] | null)?.map((glaze) => ({
+        id: glaze.id,
+        name: glaze.glaze_name,
+        brand: glaze.brand,
+        status: glaze.status,
+      })) ?? [];
 
-    return { glazes };
+    const activeGlazes = glazes.filter((glaze) => glaze.status === "active");
+
+    return { activeGlazes, allGlazes: glazes };
   } catch {
-    return { glazes: [], error: "Unable to load glazes." };
+    return { activeGlazes: [], allGlazes: [], error: "Unable to load glazes." };
   }
 }
 
