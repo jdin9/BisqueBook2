@@ -1,4 +1,4 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { clerkClient, currentUser } from "@clerk/nextjs/server";
 import { unstable_noStore as noStore } from "next/cache";
 import { type PotteryConeOption, type PotteryGlazeFilterOption, type PotteryGlazeOption, type PotteryProject } from "@/components/pottery/types";
 import { getSupabaseAnonClient, getSupabaseServiceRoleClient } from "@/lib/storage";
@@ -14,7 +14,10 @@ export default async function PotteryPage() {
   const { activeGlazes, allGlazes, error: glazeError } = await fetchGlazesWithStatus();
   const { cones, error: coneError } = await fetchCones();
   const user = await currentUser();
-  const makerName = user ? user.fullName || [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username : null;
+  const safeUsername = user?.username && !user.username.includes("@") ? user.username : undefined;
+  const makerName = user
+    ? user.fullName || [user.firstName, user.lastName].filter(Boolean).join(" ") || safeUsername || null
+    : null;
   const errors = [error, glazeError, coneError].filter((value): value is string => Boolean(value));
 
   return (
@@ -108,6 +111,7 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
     const supabase = getSupabaseAnonClient();
     const storageClient = getSupabaseServiceRoleClient();
     const bucket = process.env.SUPABASE_STORAGE_BUCKET || "attachments";
+    const clerk = await clerkClient();
 
     const { data: projectRows, error: projectError } = await supabase
       .from("Projects")
@@ -224,14 +228,34 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
             const firstName = metadata && typeof metadata.first_name === "string" ? metadata.first_name : undefined;
             const lastName = metadata && typeof metadata.last_name === "string" ? metadata.last_name : undefined;
             const fullNameFromParts = [firstName, lastName].filter(Boolean).join(" ").trim();
-            const name =
-              fullNameFromParts ||
-              (metadata && typeof metadata.full_name === "string" ? metadata.full_name : undefined) ||
-              (metadata && typeof metadata.name === "string" ? metadata.name : undefined) ||
-              (data.user.email && typeof data.user.email === "string" ? data.user.email : undefined) ||
-              "Unknown maker";
+            const clerkUserId = metadata && typeof metadata.clerkUserId === "string" ? metadata.clerkUserId : undefined;
 
-            makerLookup.set(makerId, name);
+            let name: string | undefined;
+
+            if (clerkUserId) {
+              try {
+                const clerkUser = await clerk.users.getUser(clerkUserId);
+                const safeClerkUsername =
+                  clerkUser.username && !clerkUser.username.includes("@") ? clerkUser.username : undefined;
+                name =
+                  [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ").trim() ||
+                  clerkUser.fullName ||
+                  safeClerkUsername ||
+                  undefined;
+              } catch (clerkError) {
+                console.error("Unable to load maker name from Clerk", { makerId, clerkUserId, error: clerkError });
+              }
+            }
+
+            if (!name) {
+              name =
+                fullNameFromParts ||
+                (metadata && typeof metadata.full_name === "string" ? metadata.full_name : undefined) ||
+                (metadata && typeof metadata.name === "string" ? metadata.name : undefined) ||
+                undefined;
+            }
+
+            makerLookup.set(makerId, name || "Unknown maker");
           } catch (lookupError) {
             console.error("Unexpected maker lookup failure", lookupError);
           }
