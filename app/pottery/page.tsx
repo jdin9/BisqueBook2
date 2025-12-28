@@ -165,6 +165,23 @@ async function fetchPotteryProjects(currentMaker: CurrentMaker): Promise<{ proje
 
     const projectIds = typedProjects.map((project) => project.id);
     const makerIds = Array.from(new Set(typedProjects.map((project) => project.user_id)));
+    const makerLookup = new Map<string, string>();
+    let currentMakerSupabaseId: string | null = null;
+
+    if (currentMaker.clerkUserId) {
+      try {
+        const { data, error } = await storageClient.auth.admin.getUserByExternalId(currentMaker.clerkUserId);
+
+        if (!error && data?.user) {
+          currentMakerSupabaseId = data.user.id;
+          if (currentMaker.makerName) {
+            makerLookup.set(data.user.id, currentMaker.makerName);
+          }
+        }
+      } catch (lookupError) {
+        console.error("Unable to resolve Supabase user for current maker", lookupError);
+      }
+    }
 
     const [{ data: projectPhotoRows, error: projectPhotoError }, { data: activityRows, error: activityError }] =
       await Promise.all([
@@ -219,11 +236,13 @@ async function fetchPotteryProjects(currentMaker: CurrentMaker): Promise<{ proje
       };
     });
 
-    const makerLookup = new Map<string, string>();
-
     if (makerIds.length) {
       await Promise.all(
         makerIds.map(async (makerId) => {
+          if (makerLookup.has(makerId)) {
+            return;
+          }
+
           try {
             const { data, error } = await storageClient.auth.admin.getUserById(makerId);
 
@@ -239,6 +258,11 @@ async function fetchPotteryProjects(currentMaker: CurrentMaker): Promise<{ proje
             const clerkUserId = metadata && typeof metadata.clerkUserId === "string" ? metadata.clerkUserId : undefined;
 
             let name: string | undefined;
+
+            if (currentMakerSupabaseId && makerId === currentMakerSupabaseId && currentMaker.makerName) {
+              makerLookup.set(makerId, currentMaker.makerName);
+              return;
+            }
 
             if (clerkUserId && currentMaker.clerkUserId && clerkUserId === currentMaker.clerkUserId) {
               name = currentMaker.makerName ?? undefined;
