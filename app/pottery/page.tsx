@@ -15,7 +15,12 @@ export default async function PotteryPage() {
   const user = await currentUser();
   const safeUsername = user?.username && !user.username.includes("@") ? user.username : undefined;
   const makerName = user
-    ? user.fullName || [user.firstName, user.lastName].filter(Boolean).join(" ") || safeUsername || null
+    ? user.primaryEmailAddress?.emailAddress ||
+      user.emailAddresses?.[0]?.emailAddress ||
+      user.fullName ||
+      [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+      safeUsername ||
+      null
     : null;
   const { projects, error } = await fetchPotteryProjects({
     clerkUserId: user?.id ?? null,
@@ -241,7 +246,11 @@ async function fetchPotteryProjects(currentMaker: CurrentMaker): Promise<{ proje
             const fullNameFromParts = [firstName, lastName].filter(Boolean).join(" ").trim();
             const clerkUserId = metadata && typeof metadata.clerkUserId === "string" ? metadata.clerkUserId : undefined;
 
-            let name: string | undefined;
+            let name: string | undefined = typeof data.user.email === "string" ? data.user.email : undefined;
+
+            if (clerkUserId && currentMaker.clerkUserId && clerkUserId === currentMaker.clerkUserId) {
+              name = currentMaker.makerName ?? undefined;
+            }
 
             if (clerkUserId && currentMaker.clerkUserId && clerkUserId === currentMaker.clerkUserId) {
               name = currentMaker.makerName ?? undefined;
@@ -265,6 +274,7 @@ async function fetchPotteryProjects(currentMaker: CurrentMaker): Promise<{ proje
             if (!name) {
               name =
                 fullNameFromParts ||
+                (metadata && typeof metadata.email === "string" ? metadata.email : undefined) ||
                 (metadata && typeof metadata.full_name === "string" ? metadata.full_name : undefined) ||
                 (metadata && typeof metadata.name === "string" ? metadata.name : undefined) ||
                 undefined;
