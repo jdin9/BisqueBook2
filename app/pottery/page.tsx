@@ -220,10 +220,14 @@ async function fetchPotteryProjects(): Promise<{ projects: PotteryProject[]; err
               return;
             }
 
+            const metadata = data.user.user_metadata as Record<string, unknown> | null;
+            const firstName =
+              metadata && typeof metadata.first_name === "string" ? metadata.first_name : undefined;
+            const lastName = metadata && typeof metadata.last_name === "string" ? metadata.last_name : undefined;
+            const fullNameFromParts = [firstName, lastName].filter(Boolean).join(" ");
             const name =
-              (data.user.user_metadata?.name as string | undefined) ||
-              data.user.email ||
-              data.user.user_metadata?.email ||
+              fullNameFromParts ||
+              (metadata && typeof metadata.name === "string" ? metadata.name : undefined) ||
               makerId;
 
             makerLookup.set(makerId, name);
