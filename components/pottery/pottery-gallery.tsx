@@ -10,6 +10,7 @@ import { ProjectCard } from "./project-card";
 import {
   type PotteryConeOption,
   type PotteryGlazeOption,
+  type PotteryFilterState,
   type PotteryActivity,
   type PotteryProject,
 } from "./types";
@@ -24,9 +25,11 @@ type PotteryGalleryProps = {
   projects: PotteryProject[];
   glazes: PotteryGlazeOption[];
   cones: PotteryConeOption[];
+  filters: PotteryFilterState;
+  activeGlazeIds: string[];
 };
 
-export function PotteryGallery({ projects, glazes, cones }: PotteryGalleryProps) {
+export function PotteryGallery({ projects, glazes, cones, filters, activeGlazeIds }: PotteryGalleryProps) {
   const [projectList, setProjectList] = useState<PotteryProject[]>(projects);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
@@ -36,8 +39,30 @@ export function PotteryGallery({ projects, glazes, cones }: PotteryGalleryProps)
     setProjectList(projects);
   }, [projects]);
 
+  const filteredProjects = useMemo(() => {
+    const glazeFilterSet = new Set(filters.glazeIds);
+    if (filters.includeAllActiveGlazes) {
+      activeGlazeIds.forEach((id) => glazeFilterSet.add(id));
+    }
+
+    return projectList.filter((project) => {
+      const matchesGlaze =
+        glazeFilterSet.size === 0 || project.glazeIdsUsed.some((glazeId) => glazeFilterSet.has(glazeId));
+      const matchesClay = filters.clayIds.length === 0 || filters.clayIds.includes(project.clayId);
+      const matchesMaker = filters.makerIds.length === 0 || filters.makerIds.includes(project.makerId);
+      return matchesGlaze && matchesClay && matchesMaker;
+    });
+  }, [activeGlazeIds, filters.clayIds, filters.glazeIds, filters.includeAllActiveGlazes, filters.makerIds, projectList]);
+
+  useEffect(() => {
+    if (selectedProjectId && !filteredProjects.some((project) => project.id === selectedProjectId)) {
+      setSelectedProjectId(null);
+      setSelectedPhotoId(null);
+    }
+  }, [filteredProjects, selectedProjectId]);
+
   const galleryPhotos = useMemo<GalleryPhoto[]>(() => {
-    const photos: GalleryPhoto[] = projectList.flatMap((project) => [
+    const photos: GalleryPhoto[] = filteredProjects.flatMap((project) => [
       ...project.projectPhotos.map((photo) => ({
         ...photo,
         projectId: project.id,
@@ -61,7 +86,7 @@ export function PotteryGallery({ projects, glazes, cones }: PotteryGalleryProps)
         return true;
       })
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }, [projectList]);
+  }, [filteredProjects]);
 
   const [activeIndex, setActiveIndex] = useState(0);
   const photoCount = galleryPhotos.length;
@@ -156,21 +181,28 @@ export function PotteryGallery({ projects, glazes, cones }: PotteryGalleryProps)
           <h2 className="text-xl font-semibold">Projects</h2>
           <p className="text-sm text-muted-foreground">Browse clay bodies, glazes, and firing details.</p>
         </div>
-        <span className="text-sm text-muted-foreground">{projectList.length} active</span>
+        <span className="text-sm text-muted-foreground">{filteredProjects.length} active</span>
       </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {projectList.map((project) => (
-          <ProjectCard
-            key={project.id}
-            project={project}
-            onSelect={() => {
-              setSelectedProjectId(project.id);
-              const firstPhoto = project.projectPhotos[0] || project.activities.flatMap((activity) => activity.photos)[0];
-              setSelectedPhotoId(firstPhoto?.id ?? null);
-            }}
-          />
-        ))}
-      </div>
+      {filteredProjects.length === 0 ? (
+        <div className="rounded-lg border border-dashed bg-muted/40 px-4 py-6 text-sm text-muted-foreground">
+          No projects match the selected filters. Adjust the glaze, clay body, or maker filters to see projects again.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filteredProjects.map((project) => (
+            <ProjectCard
+              key={project.id}
+              project={project}
+              onSelect={() => {
+                setSelectedProjectId(project.id);
+                const firstPhoto =
+                  project.projectPhotos[0] || project.activities.flatMap((activity) => activity.photos)[0];
+                setSelectedPhotoId(firstPhoto?.id ?? null);
+              }}
+            />
+          ))}
+        </div>
+      )}
 
       {activeProject && (
         <ProjectActivityDialog
@@ -200,6 +232,11 @@ export function PotteryGallery({ projects, glazes, cones }: PotteryGalleryProps)
                     ? Array.from(new Set([...project.glazesUsed, activity.glazeName]))
                     : project.glazesUsed;
 
+                const updatedGlazeIds =
+                  activity.type === "glaze" && activity.glazeId
+                    ? Array.from(new Set([...project.glazeIdsUsed, activity.glazeId]))
+                    : project.glazeIdsUsed;
+
                 const activities = [...project.activities, activity].sort(
                   (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
                 );
@@ -208,6 +245,7 @@ export function PotteryGallery({ projects, glazes, cones }: PotteryGalleryProps)
                   ...project,
                   activities,
                   glazesUsed: updatedGlazes,
+                  glazeIdsUsed: updatedGlazeIds,
                   updatedAt: activity.createdAt,
                 };
               });
