@@ -248,6 +248,7 @@ export async function POST(request: Request) {
       id: activityRow.id as string,
       type: activityRow.type as "glaze" | "fire",
       notes: (activityRow.notes as string | null) ?? null,
+      glazeId: activityRow.glaze_id as string | null,
       glazeName: Array.isArray(glazeRelation)
         ? glazeRelation[0]?.glaze_name || undefined
         : glazeRelation?.glaze_name || undefined,
