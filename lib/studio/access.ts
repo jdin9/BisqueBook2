@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { redirectToSignIn } from "@clerk/nextjs";
 import type { StudioMembership } from "@prisma/client";
 
 import { getCurrentUserProfile, type CurrentUserProfile } from "@/lib/auth";
@@ -51,7 +50,9 @@ export async function requireStudioMembership(options: RequireOptions) {
 
   if ("error" in result) {
     if (result.error.status === 401) {
-      return redirectToSignIn({ returnBackUrl: options.returnBackUrl });
+      const redirectUrl = new URL("/sign-in", process.env.NEXT_PUBLIC_APP_URL || "http://localhost");
+      redirectUrl.searchParams.set("redirect_url", options.returnBackUrl);
+      return redirect(redirectUrl.pathname + redirectUrl.search);
     }
 
     if (result.error.status === 503) {

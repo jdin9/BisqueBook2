@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   try {
     const { userId } = await auth();
 
-    const authorization = await authorizeStudioMember({ userId });
+    const authorization = await authorizeStudioMember({ userId: userId ?? undefined });
 
     if ("error" in authorization) {
       return NextResponse.json({ error: authorization.error.message }, { status: authorization.error.status });
@@ -154,7 +154,7 @@ export async function DELETE(request: Request) {
   try {
     const { userId } = await auth();
 
-    const authorization = await authorizeStudioMember({ userId });
+    const authorization = await authorizeStudioMember({ userId: userId ?? undefined });
 
     if ("error" in authorization) {
       return NextResponse.json({ error: authorization.error.message }, { status: authorization.error.status });
