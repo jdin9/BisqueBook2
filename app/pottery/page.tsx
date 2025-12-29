@@ -4,11 +4,14 @@ import { type PotteryConeOption, type PotteryGlazeFilterOption, type PotteryGlaz
 import { getSupabaseAnonClient, getSupabaseServiceRoleClient } from "@/lib/storage";
 import { PotteryPageClient } from "@/components/pottery/pottery-page-client";
 import { WelcomeModal } from "@/components/welcome-modal";
+import { requireStudioMembership } from "@/lib/studio/access";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function PotteryPage() {
+  await requireStudioMembership({ returnBackUrl: "/pottery", redirectPath: "/join" });
+
   const { activeClays, allClays } = await fetchClays();
   const { activeGlazes, allGlazes, error: glazeError } = await fetchGlazesWithStatus();
   const { cones, error: coneError } = await fetchCones();
