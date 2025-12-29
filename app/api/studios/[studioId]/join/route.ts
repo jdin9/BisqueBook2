@@ -83,8 +83,10 @@ export async function POST(request: NextRequest, context: { params: Promise<{ st
       const statusMessages: Record<StudioMembershipStatus, string> = {
         [StudioMembershipStatus.Pending]: "You already have a pending request for this studio.",
         [StudioMembershipStatus.Approved]: "You are already a member of this studio.",
-        [StudioMembershipStatus.Denied]: "Your previous request was denied. Contact the studio for assistance.",
-        [StudioMembershipStatus.Removed]: "Your membership was removed. Contact the studio for assistance.",
+        [StudioMembershipStatus.Denied]:
+          "Your previous request was denied. Ask the studio to generate a new invite link to try again.",
+        [StudioMembershipStatus.Removed]:
+          "Your membership was removed. Ask the studio to generate a new invite link to request access again.",
       };
 
       return NextResponse.json({ error: statusMessages[existingMembership.status] }, { status: 409 });
