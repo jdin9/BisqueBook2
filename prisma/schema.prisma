@@ -17,10 +17,10 @@ model UserProfile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  studiosOwned   Studio[]       @relation("StudioOwner")
-  studioMembers  StudioMember[]
-  projects       Project[]      @relation("ProjectCreator")
-  firingsHandled Firing[]       @relation("FiringOperator")
+  studiosOwned      Studio[]           @relation("StudioOwner")
+  studioMemberships StudioMembership[]
+  projects          Project[]          @relation("ProjectCreator")
+  firingsHandled    Firing[]           @relation("FiringOperator")
 }
 
 model Studio {
@@ -34,21 +34,22 @@ model Studio {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  owner    UserProfile    @relation("StudioOwner", fields: [ownerId], references: [id])
-  members  StudioMember[]
-  kilns    Kiln[]
-  clays    Clay[]
-  glazes   Glaze[]
-  projects Project[]
+  owner       UserProfile        @relation("StudioOwner", fields: [ownerId], references: [id])
+  memberships StudioMembership[]
+  kilns       Kiln[]
+  clays       Clay[]
+  glazes      Glaze[]
+  projects    Project[]
 }
 
-model StudioMember {
+model StudioMembership {
   id        String                 @id @default(cuid())
+  userId    String                 @unique
   studioId  String
-  userId    String
-  role      String?
-  status    StudioMembershipStatus @default(pending)
+  role      StudioMembershipRole   @default(Member)
+  status    StudioMembershipStatus @default(Pending)
   createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
 
   studio Studio      @relation(fields: [studioId], references: [id])
   user   UserProfile @relation(fields: [userId], references: [id])
@@ -56,10 +57,16 @@ model StudioMember {
   @@unique([studioId, userId])
 }
 
+enum StudioMembershipRole {
+  Admin
+  Member
+}
+
 enum StudioMembershipStatus {
-  pending
-  active
-  revoked
+  Pending
+  Approved
+  Denied
+  Removed
 }
 
 model Kiln {

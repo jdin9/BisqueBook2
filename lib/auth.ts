@@ -1,5 +1,5 @@
 import { clerkClient, currentUser } from "@clerk/nextjs/server";
-import type { StudioMember, UserProfile } from "@prisma/client";
+import { StudioMembershipStatus, type StudioMembership, type UserProfile } from "@prisma/client";
 
 import { getPrismaClient, isDatabaseConfigured } from "@/lib/prisma";
 
@@ -8,7 +8,7 @@ type DerivedProfile = {
 };
 
 export type CurrentUserProfile = UserProfile & {
-  studioMembers: StudioMember[];
+  studioMemberships: StudioMembership[];
 } & DerivedProfile;
 
 export async function getCurrentUserProfile(userId?: string): Promise<CurrentUserProfile | null> {
@@ -28,7 +28,7 @@ export async function getCurrentUserProfile(userId?: string): Promise<CurrentUse
   const prisma = getPrismaClient();
   const profile = await prisma.userProfile.findUnique({
     where: { userId: resolvedUserId },
-    include: { studioMembers: true },
+    include: { studioMemberships: true },
   });
 
   const ensuredProfile =
@@ -43,14 +43,14 @@ export async function getCurrentUserProfile(userId?: string): Promise<CurrentUse
               [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
               null,
           },
-          include: { studioMembers: true },
+          include: { studioMemberships: true },
         })
       : null);
 
   if (!ensuredProfile) return null;
 
-  const activeMemberships = ensuredProfile.studioMembers.filter(
-    (member) => member.status === "active",
+  const activeMemberships = ensuredProfile.studioMemberships.filter(
+    (member) => member.status === StudioMembershipStatus.Approved,
   );
 
   const studioId = activeMemberships[0]?.studioId ?? null;
