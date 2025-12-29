@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { authorizeStudioMember } from "@/lib/studio/access";
 import { ensureStorageBucketExists, getSupabaseServiceRoleClient } from "@/lib/storage";
 
 export const runtime = "nodejs";
@@ -9,12 +10,15 @@ export async function POST(request: Request) {
   try {
     const { userId } = await auth();
 
-    if (!userId) {
-      return NextResponse.json({ error: "You must be signed in to create a project." }, { status: 401 });
+    const authorization = await authorizeStudioMember({ userId });
+
+    if ("error" in authorization) {
+      return NextResponse.json({ error: authorization.error.message }, { status: authorization.error.status });
     }
 
+    const resolvedUserId = userId ?? authorization.profile.userId;
     const clerk = await clerkClient();
-    const clerkUser = await clerk.users.getUser(userId);
+    const clerkUser = await clerk.users.getUser(resolvedUserId);
     const email = clerkUser.emailAddresses.find((address) => address.id === clerkUser.primaryEmailAddressId)?.emailAddress;
 
     if (!email) {
@@ -59,7 +63,7 @@ export async function POST(request: Request) {
         email,
         email_confirm: true,
         user_metadata: {
-          clerkUserId: userId,
+          clerkUserId: resolvedUserId,
           name: clerkUser.fullName || undefined,
         },
       });
@@ -150,8 +154,10 @@ export async function DELETE(request: Request) {
   try {
     const { userId } = await auth();
 
-    if (!userId) {
-      return NextResponse.json({ error: "You must be signed in to delete a project." }, { status: 401 });
+    const authorization = await authorizeStudioMember({ userId });
+
+    if ("error" in authorization) {
+      return NextResponse.json({ error: authorization.error.message }, { status: authorization.error.status });
     }
 
     const body = await request.json().catch(() => null);
