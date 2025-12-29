@@ -1,8 +1,70 @@
 import { NextResponse } from "next/server";
 import { auth, clerkClient } from "@clerk/nextjs/server";
+import type { User } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { authorizeStudioMember } from "@/lib/studio/access";
 import { ensureStorageBucketExists, getSupabaseServiceRoleClient } from "@/lib/storage";
+import { StudioMembershipRole } from "@/lib/types";
+
+type SupabaseAdminClient = ReturnType<typeof getSupabaseServiceRoleClient>;
+
+function getPrimaryEmailAddress(clerkUser: User) {
+  return clerkUser.emailAddresses.find((address) => address.id === clerkUser.primaryEmailAddressId)?.emailAddress;
+}
+
+async function ensureSupabaseUserId({
+  supabase,
+  email,
+  resolvedUserId,
+  clerkUser,
+}: {
+  supabase: SupabaseAdminClient;
+  email: string;
+  resolvedUserId: string;
+  clerkUser: User;
+}): Promise<{ supabaseUserId: string } | { errorResponse: ReturnType<typeof NextResponse.json> }> {
+  const { data: existingUsers, error: listUsersError } = await supabase.auth.admin.listUsers();
+
+  if (listUsersError) {
+    console.error("Supabase auth user lookup by email failed", listUsersError);
+    return {
+      errorResponse: NextResponse.json(
+        { error: "Unable to process request because Supabase user lookup failed. Try again or contact support." },
+        { status: 500 },
+      ),
+    };
+  }
+
+  const matchedUser = existingUsers?.users?.find((user) => user.email?.toLowerCase() === email.toLowerCase());
+
+  if (matchedUser?.id) {
+    return { supabaseUserId: matchedUser.id };
+  }
+
+  const { data: createdUser, error: createUserError } = await supabase.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    user_metadata: {
+      clerkUserId: resolvedUserId,
+      name: clerkUser.fullName || undefined,
+    },
+  });
+
+  if (createUserError || !createdUser?.user) {
+    console.error("Supabase auth user creation failed", createUserError);
+    return {
+      errorResponse: NextResponse.json(
+        {
+          error:
+            "Unable to process request because a Supabase user could not be provisioned for your account. Please check Supabase auth settings.",
+        },
+        { status: 500 },
+      ),
+    };
+  }
+
+  return { supabaseUserId: createdUser.user.id };
+}
 
 export const runtime = "nodejs";
 
@@ -19,7 +81,7 @@ export async function POST(request: Request) {
     const resolvedUserId = userId ?? authorization.profile.userId;
     const clerk = await clerkClient();
     const clerkUser = await clerk.users.getUser(resolvedUserId);
-    const email = clerkUser.emailAddresses.find((address) => address.id === clerkUser.primaryEmailAddressId)?.emailAddress;
+    const email = getPrimaryEmailAddress(clerkUser);
 
     if (!email) {
       return NextResponse.json(
@@ -42,45 +104,18 @@ export async function POST(request: Request) {
     const bucket = process.env.SUPABASE_STORAGE_BUCKET || "attachments";
     await ensureStorageBucketExists(bucket);
 
-    const { data: existingUsers, error: listUsersError } = await supabase.auth.admin.listUsers();
+    const supabaseUserResult = await ensureSupabaseUserId({
+      supabase,
+      email,
+      resolvedUserId,
+      clerkUser,
+    });
 
-    if (listUsersError) {
-      console.error("Supabase auth user lookup by email failed", listUsersError);
-      return NextResponse.json(
-        { error: "Unable to save project because Supabase user lookup failed. Try again or contact support." },
-        { status: 500 },
-      );
+    if ("errorResponse" in supabaseUserResult) {
+      return supabaseUserResult.errorResponse;
     }
 
-    const matchedUser = existingUsers?.users?.find(
-      (user) => user.email?.toLowerCase() === email.toLowerCase(),
-    );
-
-    let supabaseUserId = matchedUser?.id;
-
-    if (!supabaseUserId) {
-      const { data: createdUser, error: createUserError } = await supabase.auth.admin.createUser({
-        email,
-        email_confirm: true,
-        user_metadata: {
-          clerkUserId: resolvedUserId,
-          name: clerkUser.fullName || undefined,
-        },
-      });
-
-      if (createUserError || !createdUser?.user) {
-        console.error("Supabase auth user creation failed", createUserError);
-        return NextResponse.json(
-          {
-            error:
-              "Unable to save project because a Supabase user could not be provisioned for your account. Please check Supabase auth settings.",
-          },
-          { status: 500 },
-        );
-      }
-
-      supabaseUserId = createdUser.user.id;
-    }
+    const { supabaseUserId } = supabaseUserResult;
 
     const { data: projectInsert, error: projectError } = await supabase
       .from("Projects")
@@ -160,6 +195,18 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: authorization.error.message }, { status: authorization.error.status });
     }
 
+    const resolvedUserId = userId ?? authorization.profile.userId;
+    const clerk = await clerkClient();
+    const clerkUser = await clerk.users.getUser(resolvedUserId);
+    const email = getPrimaryEmailAddress(clerkUser);
+
+    if (!email) {
+      return NextResponse.json(
+        { error: "Unable to delete project. Your account is missing a primary email address in Clerk." },
+        { status: 400 },
+      );
+    }
+
     const body = await request.json().catch(() => null);
     const projectId = (body?.projectId as string | null)?.trim();
 
@@ -168,7 +215,38 @@ export async function DELETE(request: Request) {
     }
 
     const supabase = getSupabaseServiceRoleClient();
+    const { data: projectRow, error: projectLookupError } = await supabase
+      .from("Projects")
+      .select("user_id")
+      .eq("id", projectId)
+      .single();
+
+    if (projectLookupError) {
+      console.error("Failed to look up pottery project owner", projectLookupError);
+      return NextResponse.json({ error: "Unable to find the requested project." }, { status: 404 });
+    }
+
     const bucket = await ensureStorageBucketExists(process.env.SUPABASE_STORAGE_BUCKET || "attachments");
+
+    if (authorization.membership.role !== StudioMembershipRole.Admin) {
+      const supabaseUserResult = await ensureSupabaseUserId({
+        supabase,
+        email,
+        resolvedUserId,
+        clerkUser,
+      });
+
+      if ("errorResponse" in supabaseUserResult) {
+        return supabaseUserResult.errorResponse;
+      }
+
+      if (projectRow.user_id !== supabaseUserResult.supabaseUserId) {
+        return NextResponse.json(
+          { error: "Only project creators or studio admins can delete this project." },
+          { status: 403 },
+        );
+      }
+    }
 
     const [{ data: projectPhotos, error: projectPhotosError }, { data: activityPhotos, error: activityPhotosError }] =
       await Promise.all([
