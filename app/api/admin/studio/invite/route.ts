@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { StudioMembershipRole, StudioMembershipStatus, type Studio } from "@prisma/client";
+import type { Studio } from "@prisma/client";
 
 import { getCurrentUserProfile } from "@/lib/auth";
 import { getPrismaClient, isDatabaseConfigured } from "@/lib/prisma";
 import { getStudioInviteDetails, rotateStudioInvite } from "@/lib/studio/invites";
+import { StudioMembershipRole, StudioMembershipStatus } from "@/lib/types";
 
 export const runtime = "nodejs";
 

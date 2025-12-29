@@ -1,17 +1,19 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { Prisma, StudioMembershipRole, StudioMembershipStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 import { getCurrentUserProfile } from "@/lib/auth";
 import { getPrismaClient, isDatabaseConfigured } from "@/lib/prisma";
+import { StudioMembershipRole, StudioMembershipStatus } from "@/lib/types";
 
 export const runtime = "nodejs";
 
 const DAILY_JOIN_REQUEST_LIMIT = 10;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-export async function POST(request: Request, { params }: { params: { studioId: string } }) {
+export async function POST(request: NextRequest, context: { params: Promise<{ studioId: string }> }) {
   const { userId, redirectToSignIn } = await auth();
+  const { studioId } = await context.params;
 
   if (!userId) {
     return redirectToSignIn({ returnBackUrl: request.url });
@@ -47,7 +49,7 @@ export async function POST(request: Request, { params }: { params: { studioId: s
   }
 
   const prisma = getPrismaClient();
-  const studio = await prisma.studio.findUnique({ where: { id: params.studioId } });
+  const studio = await prisma.studio.findUnique({ where: { id: studioId } });
 
   if (!studio || studio.inviteToken !== inviteToken) {
     return NextResponse.json(
@@ -59,7 +61,7 @@ export async function POST(request: Request, { params }: { params: { studioId: s
   const limitWindowStart = new Date(Date.now() - ONE_DAY_MS);
   const recentAttempts = await prisma.studioMembership.count({
     where: {
-      studioId: params.studioId,
+      studioId,
       status: {
         in: [StudioMembershipStatus.Pending, StudioMembershipStatus.Denied, StudioMembershipStatus.Approved],
       },
@@ -77,7 +79,7 @@ export async function POST(request: Request, { params }: { params: { studioId: s
   const existingMembership = await prisma.studioMembership.findUnique({ where: { userId: profile.id } });
 
   if (existingMembership) {
-    if (existingMembership.studioId === params.studioId) {
+    if (existingMembership.studioId === studioId) {
       const statusMessages: Record<StudioMembershipStatus, string> = {
         [StudioMembershipStatus.Pending]: "You already have a pending request for this studio.",
         [StudioMembershipStatus.Approved]: "You are already a member of this studio.",
@@ -97,7 +99,7 @@ export async function POST(request: Request, { params }: { params: { studioId: s
   try {
     const membership = await prisma.studioMembership.create({
       data: {
-        studioId: params.studioId,
+        studioId,
         userId: profile.id,
         role: StudioMembershipRole.Member,
         status: StudioMembershipStatus.Pending,
