@@ -35,6 +35,34 @@ type GlazeRecord = {
   status: Status;
 };
 
+type MembershipUser = {
+  name: string | null;
+  email: string | null;
+};
+
+type MembershipRequest = {
+  id: string;
+  userId: string;
+  status: string;
+  createdAt: string;
+  user: MembershipUser;
+};
+
+type StudioMember = MembershipRequest;
+
+type JoinLimitStatus = {
+  recentCount: number;
+  dailyLimit: number;
+  windowMs: number;
+  limitReached: boolean;
+};
+
+type InviteDetails = {
+  inviteToken: string;
+  inviteUrl: string;
+  inviteTokenCreatedAt: string;
+};
+
 const coneChart = [
   { cone: "Cone 10", temperature: "2381°F" },
   { cone: "Cone 9", temperature: "2336°F" },
@@ -99,14 +127,28 @@ export default function AdminPageClient() {
   const [kilnError, setKilnError] = useState<string | null>(null);
   const [clayError, setClayError] = useState<string | null>(null);
   const [glazeError, setGlazeError] = useState<string | null>(null);
+  const [membershipError, setMembershipError] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [membershipStatus, setMembershipStatus] = useState<string | null>(null);
 
   const [isLoadingKilns, setIsLoadingKilns] = useState(false);
   const [isLoadingClays, setIsLoadingClays] = useState(false);
   const [isLoadingGlazes, setIsLoadingGlazes] = useState(false);
+  const [isLoadingMemberships, setIsLoadingMemberships] = useState(false);
+  const [isLoadingInvite, setIsLoadingInvite] = useState(false);
 
   const [isSubmittingKiln, setIsSubmittingKiln] = useState(false);
   const [isSubmittingClay, setIsSubmittingClay] = useState(false);
   const [isSubmittingGlaze, setIsSubmittingGlaze] = useState(false);
+  const [membershipActionId, setMembershipActionId] = useState<string | null>(null);
+  const [inviteStatus, setInviteStatus] = useState<string | null>(null);
+  const [isRotatingInvite, setIsRotatingInvite] = useState(false);
+  const [isCopyingInvite, setIsCopyingInvite] = useState(false);
+
+  const [membershipRequests, setMembershipRequests] = useState<MembershipRequest[]>([]);
+  const [members, setMembers] = useState<StudioMember[]>([]);
+  const [joinLimitStatus, setJoinLimitStatus] = useState<JoinLimitStatus | null>(null);
+  const [inviteDetails, setInviteDetails] = useState<InviteDetails | null>(null);
 
   const supabase = useMemo(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -229,11 +271,67 @@ export default function AdminPageClient() {
     }
   }, []);
 
+  const fetchMemberships = useCallback(async () => {
+    setIsLoadingMemberships(true);
+    setMembershipError(null);
+
+    try {
+      const response = await fetch("/api/admin/studio/members", { cache: "no-store" });
+      const payload = (await response.json()) as {
+        requests?: MembershipRequest[];
+        members?: StudioMember[];
+        joinLimit?: JoinLimitStatus;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Unable to load membership requests.");
+      }
+
+      setMembershipRequests(payload.requests || []);
+      setMembers(payload.members || []);
+      setJoinLimitStatus(payload.joinLimit || null);
+    } catch (error) {
+      setMembershipError(
+        error instanceof Error ? error.message : "Unable to load membership requests. Please try again.",
+      );
+    } finally {
+      setIsLoadingMemberships(false);
+    }
+  }, []);
+
+  const fetchInviteDetails = useCallback(async () => {
+    setIsLoadingInvite(true);
+    setInviteError(null);
+    setInviteStatus(null);
+
+    try {
+      const response = await fetch("/api/admin/studio/invite", { cache: "no-store" });
+      const payload = (await response.json()) as { error?: string } & InviteDetails;
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Unable to load invite link.");
+      }
+
+      setInviteDetails({
+        inviteToken: payload.inviteToken,
+        inviteUrl: payload.inviteUrl,
+        inviteTokenCreatedAt: payload.inviteTokenCreatedAt,
+      });
+    } catch (error) {
+      setInviteError(error instanceof Error ? error.message : "Unable to load invite link. Please try again.");
+    } finally {
+      setIsLoadingInvite(false);
+    }
+  }, []);
+
   useEffect(() => {
     void fetchKilns();
     void fetchClays();
     void fetchGlazes();
-  }, [fetchKilns, fetchClays, fetchGlazes]);
+    void fetchMemberships();
+    void fetchInviteDetails();
+  }, [fetchKilns, fetchClays, fetchGlazes, fetchMemberships, fetchInviteDetails]);
 
   const handleKilnSubmit = async () => {
     setKilnError(null);
@@ -445,6 +543,86 @@ export default function AdminPageClient() {
     }
   };
 
+  const handleMembershipAction = async (membershipId: string, action: "approve" | "deny" | "remove") => {
+    setMembershipActionId(membershipId);
+    setMembershipError(null);
+    setMembershipStatus(null);
+
+    try {
+      const response = await fetch("/api/admin/studio/members", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ membershipId, action }),
+      });
+      const payload = (await response.json()) as { message?: string; error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Unable to update membership.");
+      }
+
+      await fetchMemberships();
+      setMembershipStatus(
+        action === "remove"
+          ? "Member removed and access revoked."
+          : payload?.message || "Membership updated.",
+      );
+    } catch (error) {
+      setMembershipError(error instanceof Error ? error.message : "Unable to update membership. Please try again.");
+    } finally {
+      setMembershipActionId(null);
+    }
+  };
+
+  const handleCopyInvite = async () => {
+    if (!inviteDetails?.inviteUrl) {
+      setInviteError("Invite link is not available yet.");
+      return;
+    }
+
+    setIsCopyingInvite(true);
+    setInviteError(null);
+    setInviteStatus(null);
+
+    try {
+      await navigator.clipboard.writeText(inviteDetails.inviteUrl);
+      setInviteStatus("Invite link copied to clipboard.");
+    } catch (error) {
+      setInviteError(
+        error instanceof Error ? error.message : "Unable to copy invite link right now. Please try again.",
+      );
+    } finally {
+      setIsCopyingInvite(false);
+    }
+  };
+
+  const handleRotateInvite = async () => {
+    setIsRotatingInvite(true);
+    setInviteError(null);
+    setInviteStatus(null);
+
+    try {
+      const response = await fetch("/api/admin/studio/invite", { method: "POST" });
+      const payload = (await response.json()) as { error?: string } & InviteDetails;
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Unable to regenerate invite link.");
+      }
+
+      setInviteDetails({
+        inviteToken: payload.inviteToken,
+        inviteUrl: payload.inviteUrl,
+        inviteTokenCreatedAt: payload.inviteTokenCreatedAt,
+      });
+      setInviteStatus("Invite link regenerated. Previously denied or removed requests were cleared.");
+    } catch (error) {
+      setInviteError(
+        error instanceof Error ? error.message : "Unable to regenerate invite link. Please try again.",
+      );
+    } finally {
+      setIsRotatingInvite(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="space-y-2">
@@ -478,6 +656,181 @@ export default function AdminPageClient() {
                 <Label htmlFor="studio-password">Studio Password</Label>
                 <Input id="studio-password" type="password" placeholder="Enter studio password" />
               </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Invite link</CardTitle>
+                <CardDescription>Share or regenerate the invite link for new membership requests.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {inviteError ? (
+                  <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {inviteError}
+                  </div>
+                ) : null}
+                {inviteStatus ? (
+                  <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                    {inviteStatus}
+                  </div>
+                ) : null}
+                {isLoadingInvite ? (
+                  <p className="text-sm text-muted-foreground">Loading invite link...</p>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="invite-link">Invite link</Label>
+                    <Input
+                      id="invite-link"
+                      value={inviteDetails?.inviteUrl || "Invite link will appear once loaded."}
+                      readOnly
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Created{" "}
+                      {inviteDetails?.inviteTokenCreatedAt
+                        ? new Date(inviteDetails.inviteTokenCreatedAt).toLocaleString()
+                        : "—"}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => void handleCopyInvite()}
+                        disabled={isCopyingInvite || !inviteDetails?.inviteUrl}
+                      >
+                        {isCopyingInvite ? "Copying..." : "Copy invite link"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => void handleRotateInvite()}
+                        disabled={isRotatingInvite}
+                      >
+                        {isRotatingInvite ? "Regenerating..." : "Regenerate invite link"}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Regenerating removes denied or removed requests and creates a fresh link.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Membership requests</CardTitle>
+                <CardDescription>Approve or deny pending studio access.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {membershipError ? (
+                  <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {membershipError}
+                  </div>
+                ) : null}
+                {membershipStatus ? (
+                  <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                    {membershipStatus}
+                  </div>
+                ) : null}
+                {joinLimitStatus ? (
+                  <div
+                    className={`rounded-md border px-3 py-2 text-sm ${
+                      joinLimitStatus.limitReached
+                        ? "border-amber-200 bg-amber-50 text-amber-800"
+                        : "border-muted bg-muted/50 text-muted-foreground"
+                    }`}
+                  >
+                    {joinLimitStatus.limitReached
+                      ? "Daily join request limit reached. New requests will be blocked for 24 hours."
+                      : "Daily join request limit: "}
+                    {!joinLimitStatus.limitReached ? (
+                      <span className="font-medium text-foreground">
+                        {joinLimitStatus.recentCount}/{joinLimitStatus.dailyLimit} used in the last 24 hours.
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {isLoadingMemberships ? (
+                  <p className="text-sm text-muted-foreground">Loading requests...</p>
+                ) : membershipRequests.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No pending membership requests.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {membershipRequests.map((request) => (
+                      <div
+                        key={request.id}
+                        className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="space-y-1">
+                          <p className="font-medium">{request.user.name || "Unnamed user"}</p>
+                          <p className="text-sm text-muted-foreground">{request.user.email}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Requested {new Date(request.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={membershipActionId === request.id}
+                            onClick={() => void handleMembershipAction(request.id, "deny")}
+                          >
+                            {membershipActionId === request.id ? "Updating..." : "Deny"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            disabled={membershipActionId === request.id}
+                            onClick={() => void handleMembershipAction(request.id, "approve")}
+                          >
+                            {membershipActionId === request.id ? "Updating..." : "Approve"}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Members</CardTitle>
+              <CardDescription>View approved members and revoke access immediately.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isLoadingMemberships ? (
+                <p className="text-sm text-muted-foreground">Loading members...</p>
+              ) : members.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No approved members yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {members.map((member) => (
+                    <div
+                      key={member.id}
+                      className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="space-y-1">
+                        <p className="font-medium">{member.user.name || "Unnamed user"}</p>
+                        <p className="text-sm text-muted-foreground">{member.user.email}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Approved {new Date(member.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={membershipActionId === member.id}
+                        onClick={() => void handleMembershipAction(member.id, "remove")}
+                      >
+                        {membershipActionId === member.id ? "Removing..." : "Remove"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
