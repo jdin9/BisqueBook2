@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 
 import { authorizeStudioMember } from "@/lib/studio/access";
@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 
 const validStatuses = new Set(["active", "retired"]);
 
-export async function PATCH(request: Request, context: { params: { clayId: string } }) {
+export async function PATCH(request: NextRequest, context: { params: Promise<{ clayId: string }> }) {
   const { userId } = await auth();
   const authorization = await authorizeStudioMember({
     userId: userId ?? undefined,
@@ -50,7 +50,7 @@ export async function PATCH(request: Request, context: { params: { clayId: strin
     const { data, error } = await supabase
       .from("Clays")
       .update(updates)
-      .eq("id", context.params.clayId)
+      .eq("id", (await context.params).clayId)
       .select("id, clay_body, status")
       .single();
 
@@ -70,7 +70,7 @@ export async function PATCH(request: Request, context: { params: { clayId: strin
   }
 }
 
-export async function DELETE(_request: Request, context: { params: { clayId: string } }) {
+export async function DELETE(_request: NextRequest, context: { params: Promise<{ clayId: string }> }) {
   const { userId } = await auth();
   const authorization = await authorizeStudioMember({
     userId: userId ?? undefined,
@@ -83,7 +83,7 @@ export async function DELETE(_request: Request, context: { params: { clayId: str
 
   try {
     const supabase = getSupabaseServiceRoleClient();
-    const { error } = await supabase.from("Clays").delete().eq("id", context.params.clayId);
+    const { error } = await supabase.from("Clays").delete().eq("id", (await context.params).clayId);
 
     if (error) {
       console.error("Failed to delete clay", error);
