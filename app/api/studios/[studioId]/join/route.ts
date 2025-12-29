@@ -5,11 +5,9 @@ import { Prisma } from "@prisma/client";
 import { getCurrentUserProfile } from "@/lib/auth";
 import { getPrismaClient, isDatabaseConfigured } from "@/lib/prisma";
 import { StudioMembershipRole, StudioMembershipStatus } from "@/lib/types";
+import { getJoinLimitStatus } from "@/lib/studio/memberships";
 
 export const runtime = "nodejs";
-
-const DAILY_JOIN_REQUEST_LIMIT = 10;
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 export async function POST(request: NextRequest, context: { params: Promise<{ studioId: string }> }) {
   const { userId, redirectToSignIn } = await auth();
@@ -58,20 +56,14 @@ export async function POST(request: NextRequest, context: { params: Promise<{ st
     );
   }
 
-  const limitWindowStart = new Date(Date.now() - ONE_DAY_MS);
-  const recentAttempts = await prisma.studioMembership.count({
-    where: {
-      studioId,
-      status: {
-        in: [StudioMembershipStatus.Pending, StudioMembershipStatus.Denied, StudioMembershipStatus.Approved],
-      },
-      createdAt: { gte: limitWindowStart },
-    },
-  });
+  const limitStatus = await getJoinLimitStatus(prisma, studioId);
 
-  if (recentAttempts >= DAILY_JOIN_REQUEST_LIMIT) {
+  if (limitStatus.limitReached) {
     return NextResponse.json(
-      { error: "This studio has reached its daily join request limit. Try again in 24 hours." },
+      {
+        error: "This studio has reached its daily join request limit. Try again in 24 hours.",
+        joinLimit: limitStatus,
+      },
       { status: 429 },
     );
   }

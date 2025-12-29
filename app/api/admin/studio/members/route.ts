@@ -4,6 +4,7 @@ import { StudioMembershipStatus } from "@prisma/client";
 
 import { getPrismaClient } from "@/lib/prisma";
 import { resolveAdminStudio } from "@/lib/studio/admin";
+import { getJoinLimitStatus } from "@/lib/studio/memberships";
 
 export const runtime = "nodejs";
 
@@ -36,11 +37,19 @@ export async function GET() {
   }
 
   const prisma = getPrismaClient();
-  const pending = await prisma.studioMembership.findMany({
-    where: { studioId: resolved.studio.id, status: StudioMembershipStatus.Pending },
-    include: { user: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const [pending, approved, joinLimit] = await Promise.all([
+    prisma.studioMembership.findMany({
+      where: { studioId: resolved.studio.id, status: StudioMembershipStatus.Pending },
+      include: { user: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.studioMembership.findMany({
+      where: { studioId: resolved.studio.id, status: StudioMembershipStatus.Approved },
+      include: { user: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    getJoinLimitStatus(prisma, resolved.studio.id),
+  ]);
 
   const requests = pending.map((membership) => ({
     id: membership.id,
@@ -53,7 +62,18 @@ export async function GET() {
     },
   }));
 
-  return NextResponse.json({ requests }, { status: 200 });
+  const members = approved.map((membership) => ({
+    id: membership.id,
+    userId: membership.userId,
+    status: membership.status,
+    createdAt: membership.createdAt.toISOString(),
+    user: {
+      name: membership.user.name,
+      email: membership.user.email,
+    },
+  }));
+
+  return NextResponse.json({ requests, members, joinLimit }, { status: 200 });
 }
 
 export async function POST(request: NextRequest) {
