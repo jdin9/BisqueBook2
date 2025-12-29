@@ -191,56 +191,49 @@ export default function AdminPageClient() {
     setIsLoadingClays(true);
     setClayError(null);
 
-    const { data, error } = await supabase
-      .from("Clays")
-      .select("id, clay_body, status")
-      .order("clay_body", { ascending: true });
+    try {
+      const response = await fetch("/api/pottery/clays", { cache: "no-store" });
+      const payload = (await response.json()) as { clays?: ClayRecord[]; error?: string };
 
-    if (error) {
+      if (!response.ok) {
+        throw new Error(payload?.error || "Unable to load clay bodies. Please try again.");
+      }
+
+      setClays(payload.clays || []);
+    } catch (error) {
       setClayError(
-        isMissingTable(error)
-          ? "Clays table not found. Please create it in Supabase using supabase/kilns.sql."
-          : "Unable to load clay bodies. Please try again.",
+        error instanceof Error ? error.message : "Unable to load clay bodies. Please try again.",
       );
+    } finally {
       setIsLoadingClays(false);
-      return;
     }
-
-    setClays((data as ClayRecord[]) || []);
-    setIsLoadingClays(false);
-  }, [supabase]);
+  }, []);
 
   const fetchGlazes = useCallback(async () => {
     setIsLoadingGlazes(true);
     setGlazeError(null);
 
-    const { data, error } = await supabase
-      .from("Glazes")
-      .select("id, glaze_name, brand, status")
-      .order("glaze_name", { ascending: true });
+    try {
+      const response = await fetch("/api/pottery/glazes", { cache: "no-store" });
+      const payload = (await response.json()) as { glazes?: GlazeRecord[]; error?: string };
 
-    if (error) {
-      setGlazeError(
-        isMissingTable(error)
-          ? "Glazes table not found. Please create it in Supabase using supabase/kilns.sql."
-          : "Unable to load glazes. Please try again.",
-      );
+      if (!response.ok) {
+        throw new Error(payload?.error || "Unable to load glazes. Please try again.");
+      }
+
+      setGlazes(payload.glazes || []);
+    } catch (error) {
+      setGlazeError(error instanceof Error ? error.message : "Unable to load glazes. Please try again.");
+    } finally {
       setIsLoadingGlazes(false);
-      return;
     }
+  }, []);
 
-    setGlazes((data as GlazeRecord[]) || []);
-    setIsLoadingGlazes(false);
-  }, [supabase]);
-
-  // We need to populate Supabase-backed admin tables on mount; state updates are contained within each fetch helper.
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     void fetchKilns();
     void fetchClays();
     void fetchGlazes();
   }, [fetchKilns, fetchClays, fetchGlazes]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleKilnSubmit = async () => {
     setKilnError(null);
@@ -330,23 +323,33 @@ export default function AdminPageClient() {
 
     setIsSubmittingClay(true);
 
-    const { error } = await supabase
-      .from("Clays")
-      .insert({ clay_body: trimmedBody, status: clayStatus } satisfies Omit<ClayRecord, "id">);
+    try {
+      const response = await fetch("/api/pottery/clays", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clayBody: trimmedBody, status: clayStatus }),
+      });
+      const payload = (await response.json()) as { clay?: ClayRecord; error?: string };
 
-    if (error) {
+      if (!response.ok) {
+        throw new Error(
+          payload?.error || "Unable to add clay body right now. Please try again.",
+        );
+      }
+
+      if (payload.clay) {
+        setClays((current) => [...current, payload.clay as ClayRecord]);
+      }
+
+      resetClayForm();
+      await fetchClays();
+    } catch (error) {
       setClayError(
-        isMissingTable(error)
-          ? "Clays table not found. Please create it in Supabase using supabase/kilns.sql."
-          : "Unable to add clay body right now. Please try again.",
+        error instanceof Error ? error.message : "Unable to add clay body right now. Please try again.",
       );
+    } finally {
       setIsSubmittingClay(false);
-      return;
     }
-
-    resetClayForm();
-    await fetchClays();
-    setIsSubmittingClay(false);
   };
 
   const handleGlazeSubmit = async () => {
@@ -362,23 +365,29 @@ export default function AdminPageClient() {
 
     setIsSubmittingGlaze(true);
 
-    const { error } = await supabase
-      .from("Glazes")
-      .insert({ glaze_name: trimmedName, brand: trimmedBrand, status: glazeStatus } satisfies Omit<GlazeRecord, "id">);
+    try {
+      const response = await fetch("/api/pottery/glazes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ glazeName: trimmedName, brand: trimmedBrand, status: glazeStatus }),
+      });
+      const payload = (await response.json()) as { glaze?: GlazeRecord; error?: string };
 
-    if (error) {
-      setGlazeError(
-        isMissingTable(error)
-          ? "Glazes table not found. Please create it in Supabase using supabase/kilns.sql."
-          : "Unable to add glaze right now. Please try again.",
-      );
+      if (!response.ok) {
+        throw new Error(payload?.error || "Unable to add glaze right now. Please try again.");
+      }
+
+      if (payload.glaze) {
+        setGlazes((current) => [...current, payload.glaze as GlazeRecord]);
+      }
+
+      resetGlazeForm();
+      await fetchGlazes();
+    } catch (error) {
+      setGlazeError(error instanceof Error ? error.message : "Unable to add glaze right now. Please try again.");
+    } finally {
       setIsSubmittingGlaze(false);
-      return;
     }
-
-    resetGlazeForm();
-    await fetchGlazes();
-    setIsSubmittingGlaze(false);
   };
 
   const toggleKilnStatus = async (kiln: KilnRecord) => {
@@ -396,26 +405,44 @@ export default function AdminPageClient() {
 
   const toggleClayStatus = async (clay: ClayRecord) => {
     const nextStatus: Status = clay.status === "active" ? "retired" : "active";
-    const { error } = await supabase.from("Clays").update({ status: nextStatus }).eq("id", clay.id);
 
-    if (error) {
-      setClayError("Unable to update clay status. Please try again.");
-      return;
+    try {
+      const response = await fetch(`/api/pottery/clays/${clay.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const payload = (await response.json()) as { clay?: ClayRecord; error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Unable to update clay status. Please try again.");
+      }
+
+      await fetchClays();
+    } catch (error) {
+      setClayError(error instanceof Error ? error.message : "Unable to update clay status. Please try again.");
     }
-
-    await fetchClays();
   };
 
   const toggleGlazeStatus = async (glaze: GlazeRecord) => {
     const nextStatus: Status = glaze.status === "active" ? "retired" : "active";
-    const { error } = await supabase.from("Glazes").update({ status: nextStatus }).eq("id", glaze.id);
 
-    if (error) {
-      setGlazeError("Unable to update glaze status. Please try again.");
-      return;
+    try {
+      const response = await fetch(`/api/pottery/glazes/${glaze.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const payload = (await response.json()) as { glaze?: GlazeRecord; error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Unable to update glaze status. Please try again.");
+      }
+
+      await fetchGlazes();
+    } catch (error) {
+      setGlazeError(error instanceof Error ? error.message : "Unable to update glaze status. Please try again.");
     }
-
-    await fetchGlazes();
   };
 
   return (
