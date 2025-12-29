@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+
 import { getCurrentUserProfile } from "@/lib/auth";
 import { getPrismaClient, isDatabaseConfigured } from "@/lib/prisma";
 import { submitJoinRequest } from "@/lib/studio/join";
 
 export const runtime = "nodejs";
 
-export async function POST(request: NextRequest, context: { params: Promise<{ studioId: string }> }) {
+export async function POST(request: NextRequest) {
   const { userId, redirectToSignIn } = await auth();
-  const { studioId } = await context.params;
 
   if (!userId) {
     return redirectToSignIn({ returnBackUrl: request.url });
@@ -49,7 +49,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ st
     const result = await submitJoinRequest({
       inviteToken,
       profileId: profile.id,
-      studioId,
       prisma,
     });
 
