@@ -1,5 +1,10 @@
--- CreateEnum
-CREATE TYPE "StudioMembershipStatus" AS ENUM ('pending', 'active', 'revoked');
+-- CreateEnum (safe if it already exists)
+DO $$
+BEGIN
+  CREATE TYPE "StudioMembershipStatus" AS ENUM ('pending', 'active', 'revoked');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AlterTable
 ALTER TABLE "Studio" ADD COLUMN "joinPasswordHash" TEXT;
