@@ -2,10 +2,8 @@ import { Prisma, type PrismaClient, StudioMembershipStatus, type StudioMembershi
 
 import { getPrismaClient } from "@/lib/prisma";
 import { getJoinLimitStatus } from "@/lib/studio/memberships";
+import { INVALID_INVITE_MESSAGE } from "@/lib/studio/join-messages";
 import { StudioMembershipRole } from "@/lib/types";
-
-export const INVALID_INVITE_MESSAGE =
-  "This invite link is invalid or has expired. Ask the studio owner for a new invite.";
 
 type JoinLimitStatus = Awaited<ReturnType<typeof getJoinLimitStatus>>;
 

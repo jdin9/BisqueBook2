@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type ElementType } from "react";
 import { SignedIn, SignedOut, SignInButton, SignUpButton, useUser } from "@clerk/nextjs";
 import { AlertTriangle, CheckCircle2, Clock3, Loader2, ShieldX } from "lucide-react";
-import { StudioMembershipStatus } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { INVALID_INVITE_MESSAGE } from "@/lib/studio/join";
+import { INVALID_INVITE_MESSAGE } from "@/lib/studio/join-messages";
+import { StudioMembershipStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type BannerTone = "info" | "success" | "warning" | "error";
@@ -210,12 +210,12 @@ export function InviteJoinCard({ inviteToken }: { inviteToken: string }) {
 
         <SignedOut>
           <div className="flex flex-wrap gap-3">
-            <SignInButton mode="modal" redirectUrl={redirectUrl}>
+            <SignInButton mode="modal" forceRedirectUrl={redirectUrl} fallbackRedirectUrl={redirectUrl}>
               <Button size="lg" className="gap-2">
                 Sign in and continue
               </Button>
             </SignInButton>
-            <SignUpButton mode="modal" redirectUrl={redirectUrl}>
+            <SignUpButton mode="modal" forceRedirectUrl={redirectUrl} fallbackRedirectUrl={redirectUrl}>
               <Button variant="outline" size="lg">
                 Create account
               </Button>
