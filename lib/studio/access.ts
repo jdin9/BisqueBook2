@@ -18,7 +18,19 @@ export async function authorizeStudioMember(options: AuthorizationOptions = {}):
     return { error: { status: 503, message: "Database is not configured. Set DATABASE_URL to continue." } };
   }
 
-  const profile = await getCurrentUserProfile(options.userId);
+  let profile: CurrentUserProfile | null = null;
+
+  try {
+    profile = await getCurrentUserProfile(options.userId);
+  } catch (error) {
+    console.error("Failed to authorize studio membership due to database error", error);
+    return {
+      error: {
+        status: 503,
+        message: "Database is unavailable or out of sync. Run migrations and confirm DATABASE_URL is set.",
+      },
+    };
+  }
 
   if (!profile) {
     return { error: { status: 401, message: "You must be signed in to access this area." } };
