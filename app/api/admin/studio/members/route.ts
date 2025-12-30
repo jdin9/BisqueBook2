@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { StudioMembershipStatus } from "@prisma/client";
 
+import { getCurrentUserProfile } from "@/lib/auth";
 import { getPrismaClient } from "@/lib/prisma";
 import { resolveAdminStudio } from "@/lib/studio/admin";
 import { getJoinLimitStatus } from "@/lib/studio/memberships";
+import { logMembershipDecision } from "@/lib/studio/logging";
 
 export const runtime = "nodejs";
 
@@ -91,6 +93,7 @@ export async function POST(request: NextRequest) {
 
   let membershipId: string | undefined;
   let action: ManageAction | undefined;
+  const adminProfile = await getCurrentUserProfile(userId);
 
   try {
     const body = await request.json();
@@ -107,6 +110,7 @@ export async function POST(request: NextRequest) {
   const prisma = getPrismaClient();
   const membership = await prisma.studioMembership.findUnique({
     where: { id: membershipId },
+    include: { user: true },
   });
 
   if (!membership || membership.studioId !== resolved.studio.id) {
@@ -117,6 +121,17 @@ export async function POST(request: NextRequest) {
   const updated = await prisma.studioMembership.update({
     where: { id: membership.id },
     data: { status },
+  });
+
+  logMembershipDecision({
+    action,
+    studioId: resolved.studio.id,
+    actorUserId: adminProfile?.userId ?? userId,
+    actorEmail: adminProfile?.email ?? null,
+    membershipUserId: membership.user.userId,
+    membershipEmail: membership.user.email,
+    membershipId: updated.id,
+    resultingStatus: updated.status,
   });
 
   return NextResponse.json(
