@@ -56,7 +56,8 @@ export async function requireStudioMembership(options: RequireOptions) {
     }
 
     if (result.error.status === 503) {
-      throw new Error(result.error.message);
+      const fallback = options.redirectPath || "/docs";
+      return redirect(fallback);
     }
 
     const fallback = options.redirectPath || "/join";

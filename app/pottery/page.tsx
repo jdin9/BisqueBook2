@@ -1,15 +1,45 @@
 import { clerkClient, currentUser } from "@clerk/nextjs/server";
 import { unstable_noStore as noStore } from "next/cache";
 import { type PotteryConeOption, type PotteryGlazeFilterOption, type PotteryGlazeOption, type PotteryProject } from "@/components/pottery/types";
-import { getSupabaseAnonClient, getSupabaseServiceRoleClient } from "@/lib/storage";
+import { MissingConfiguration } from "@/components/missing-configuration";
+import { getMissingSupabaseEnvKeys, getSupabaseAnonClient, getSupabaseServiceRoleClient } from "@/lib/storage";
 import { PotteryPageClient } from "@/components/pottery/pottery-page-client";
 import { WelcomeModal } from "@/components/welcome-modal";
 import { requireStudioMembership } from "@/lib/studio/access";
+import { isDatabaseConfigured } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function PotteryPage() {
+  if (!isDatabaseConfigured()) {
+    return (
+      <div className="space-y-6">
+        <WelcomeModal />
+        <MissingConfiguration
+          title="Database not configured"
+          description="Set DATABASE_URL (and DIRECT_URL if needed) in your environment to enable studio access."
+          items={["DATABASE_URL", "DIRECT_URL (optional)"]}
+        />
+      </div>
+    );
+  }
+
+  const missingSupabase = getMissingSupabaseEnvKeys();
+
+  if (missingSupabase.length) {
+    return (
+      <div className="space-y-6">
+        <WelcomeModal />
+        <MissingConfiguration
+          title="Supabase credentials missing"
+          description="Pottery pages need Supabase Storage and tables. Add the missing keys and redeploy."
+          items={missingSupabase}
+        />
+      </div>
+    );
+  }
+
   await requireStudioMembership({ returnBackUrl: "/pottery", redirectPath: "/join" });
 
   const { activeClays, allClays } = await fetchClays();
