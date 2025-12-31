@@ -18,14 +18,14 @@ BEGIN
         CONSTRAINT "Studio_pkey" PRIMARY KEY ("id")
     );
 
-    CREATE TABLE "StudioMembership" (
+    CREATE TABLE "StudioMember" (
         "id" TEXT NOT NULL,
         "studioId" TEXT NOT NULL,
         "userId" TEXT NOT NULL,
         "role" TEXT,
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-        CONSTRAINT "StudioMembership_pkey" PRIMARY KEY ("id")
+        CONSTRAINT "StudioMember_pkey" PRIMARY KEY ("id")
     );
 
     CREATE TABLE "Kiln" (
@@ -98,13 +98,13 @@ BEGIN
         CONSTRAINT "Firing_pkey" PRIMARY KEY ("id")
     );
 
-    CREATE UNIQUE INDEX "StudioMembership_studioId_userId_key" ON "StudioMembership"("studioId", "userId");
+    CREATE UNIQUE INDEX "StudioMember_studioId_userId_key" ON "StudioMember"("studioId", "userId");
 
     ALTER TABLE "Studio" ADD CONSTRAINT "Studio_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "UserProfile"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
-    ALTER TABLE "StudioMembership" ADD CONSTRAINT "StudioMembership_studioId_fkey" FOREIGN KEY ("studioId") REFERENCES "Studio"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+    ALTER TABLE "StudioMember" ADD CONSTRAINT "StudioMember_studioId_fkey" FOREIGN KEY ("studioId") REFERENCES "Studio"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
-    ALTER TABLE "StudioMembership" ADD CONSTRAINT "StudioMembership_userId_fkey" FOREIGN KEY ("userId") REFERENCES "UserProfile"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+    ALTER TABLE "StudioMember" ADD CONSTRAINT "StudioMember_userId_fkey" FOREIGN KEY ("userId") REFERENCES "UserProfile"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
     ALTER TABLE "Kiln" ADD CONSTRAINT "Kiln_studioId_fkey" FOREIGN KEY ("studioId") REFERENCES "Studio"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
