@@ -276,7 +276,7 @@ export default function AdminPageClient() {
     setMembershipError(null);
 
     try {
-      const response = await fetch("/api/studio-admin/studio/members", { cache: "no-store" });
+      const response = await fetch("/api/admin/studio/members", { cache: "no-store" });
       const payload = (await response.json()) as {
         requests?: MembershipRequest[];
         members?: StudioMember[];
@@ -306,7 +306,7 @@ export default function AdminPageClient() {
     setInviteStatus(null);
 
     try {
-      const response = await fetch("/api/studio-admin/studio/invite", { cache: "no-store" });
+      const response = await fetch("/api/admin/studio/invite", { cache: "no-store" });
       const payload = (await response.json()) as { error?: string } & InviteDetails;
 
       if (!response.ok) {
@@ -549,7 +549,7 @@ export default function AdminPageClient() {
     setMembershipStatus(null);
 
     try {
-      const response = await fetch("/api/studio-admin/studio/members", {
+      const response = await fetch("/api/admin/studio/members", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ membershipId, action }),
@@ -601,7 +601,7 @@ export default function AdminPageClient() {
     setInviteStatus(null);
 
     try {
-      const response = await fetch("/api/studio-admin/studio/invite", { method: "POST" });
+      const response = await fetch("/api/admin/studio/invite", { method: "POST" });
       const payload = (await response.json()) as { error?: string } & InviteDetails;
 
       if (!response.ok) {

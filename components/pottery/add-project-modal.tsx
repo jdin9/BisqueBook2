@@ -183,9 +183,9 @@ export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
 
               <div className="flex items-center justify-between border-t pt-4">
                 <div className="text-xs text-muted-foreground">
-                  Need the full studio admin view?{" "}
-                  <Link href="/studio-admin" className="inline-flex items-center gap-1 text-primary hover:underline">
-                    Go to studio admin
+                  Need the full admin view?{" "}
+                  <Link href="/admin" className="inline-flex items-center gap-1 text-primary hover:underline">
+                    Go to admin
                     <ArrowRight className="h-3 w-3" />
                   </Link>
                 </div>

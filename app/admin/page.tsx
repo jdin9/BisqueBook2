@@ -9,12 +9,12 @@ import AdminPageClient from "./admin-page-client";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function StudioAdminPage() {
+export default async function AdminPage() {
   if (!isDatabaseConfigured()) {
     return (
       <MissingConfiguration
         title="Database not configured"
-        description="Set DATABASE_URL (and DIRECT_URL if needed) to load the studio admin portal."
+        description="Set DATABASE_URL (and DIRECT_URL if needed) to load the admin portal."
         items={["DATABASE_URL", "DIRECT_URL (optional)"]}
       />
     );
@@ -26,14 +26,14 @@ export default async function StudioAdminPage() {
     return (
       <MissingConfiguration
         title="Supabase credentials missing"
-        description="The studio admin portal needs Supabase to load glazes, clays, and invite data."
+        description="The admin portal needs Supabase to load glazes, clays, and invite data."
         items={missingSupabase}
       />
     );
   }
 
   await requireStudioMembership({
-    returnBackUrl: "/studio-admin",
+    returnBackUrl: "/admin",
     requiredRole: StudioMembershipRole.Admin,
     redirectPath: "/join",
   });
