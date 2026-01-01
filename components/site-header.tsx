@@ -20,8 +20,8 @@ export function SiteHeader() {
           </div>
         </div>
         <nav className="flex items-center gap-3">
-          <Link href="/admin" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-            Admin
+          <Link href="/studio-admin" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+            Studio admin
           </Link>
           <Link href="/pottery" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
             Pottery
