@@ -3,6 +3,11 @@ export enum StudioMembershipRole {
   Member = "Member",
 }
 
+export enum GlobalRole {
+  User = "User",
+  SiteAdmin = "SiteAdmin",
+}
+
 export enum StudioMembershipStatus {
   Pending = "Pending",
   Approved = "Approved",

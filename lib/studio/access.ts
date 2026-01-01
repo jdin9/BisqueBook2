@@ -3,14 +3,19 @@ import type { StudioMembership } from "@prisma/client";
 
 import { getCurrentUserProfile, type CurrentUserProfile } from "@/lib/auth";
 import { isDatabaseConfigured } from "@/lib/prisma";
-import { StudioMembershipRole, StudioMembershipStatus } from "@/lib/types";
+import { GlobalRole, StudioMembershipRole, StudioMembershipStatus } from "@/lib/types";
 
 type AuthorizationSuccess = { profile: CurrentUserProfile; membership: StudioMembership };
 type AuthorizationError = { error: { status: number; message: string } };
+type GlobalAuthorizationSuccess = { profile: CurrentUserProfile };
 
 type AuthorizationOptions = {
   userId?: string;
   requiredRole?: StudioMembershipRole;
+};
+
+type SiteAdminOptions = {
+  userId?: string;
 };
 
 export async function authorizeStudioMember(options: AuthorizationOptions = {}): Promise<AuthorizationSuccess | AuthorizationError> {
@@ -49,6 +54,36 @@ export async function authorizeStudioMember(options: AuthorizationOptions = {}):
   return { profile, membership };
 }
 
+export async function authorizeSiteAdmin(options: SiteAdminOptions = {}): Promise<GlobalAuthorizationSuccess | AuthorizationError> {
+  if (!isDatabaseConfigured()) {
+    return { error: { status: 503, message: "Database is not configured. Set DATABASE_URL to continue." } };
+  }
+
+  let profile: CurrentUserProfile | null = null;
+
+  try {
+    profile = await getCurrentUserProfile(options.userId);
+  } catch (error) {
+    console.error("Failed to authorize site admin due to database error", error);
+    return {
+      error: {
+        status: 503,
+        message: "Database is unavailable or out of sync. Run migrations and confirm DATABASE_URL is set.",
+      },
+    };
+  }
+
+  if (!profile) {
+    return { error: { status: 401, message: "You must be signed in to access this area." } };
+  }
+
+  if (profile.globalRole !== GlobalRole.SiteAdmin) {
+    return { error: { status: 403, message: "Only site admins can access this area." } };
+  }
+
+  return { profile };
+}
+
 type RequireOptions = AuthorizationOptions & {
   returnBackUrl: string;
   redirectPath?: string;
@@ -59,6 +94,33 @@ export async function requireStudioMembership(options: RequireOptions) {
     userId: options.userId,
     requiredRole: options.requiredRole,
   });
+
+  if ("error" in result) {
+    if (result.error.status === 401) {
+      const redirectUrl = new URL("/sign-in", process.env.NEXT_PUBLIC_APP_URL || "http://localhost");
+      redirectUrl.searchParams.set("redirect_url", options.returnBackUrl);
+      return redirect(redirectUrl.pathname + redirectUrl.search);
+    }
+
+    if (result.error.status === 503) {
+      const fallback = options.redirectPath || "/docs";
+      return redirect(fallback);
+    }
+
+    const fallback = options.redirectPath || "/join";
+    return redirect(fallback);
+  }
+
+  return result;
+}
+
+type RequireSiteAdminOptions = SiteAdminOptions & {
+  returnBackUrl: string;
+  redirectPath?: string;
+};
+
+export async function requireSiteAdmin(options: RequireSiteAdminOptions) {
+  const result = await authorizeSiteAdmin({ userId: options.userId });
 
   if ("error" in result) {
     if (result.error.status === 401) {
