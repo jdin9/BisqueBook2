@@ -25,7 +25,7 @@ export default async function PotteryPage() {
     );
   }
 
-  const missingSupabase = getMissingSupabaseEnvKeys();
+  const missingSupabase = getMissingSupabaseEnvKeys({ requireServiceRole: false });
 
   if (missingSupabase.length) {
     return (
@@ -155,9 +155,10 @@ async function fetchPotteryProjects(currentMaker: CurrentMaker): Promise<{ proje
     noStore();
 
     const supabase = getSupabaseAnonClient();
-    const storageClient = getSupabaseServiceRoleClient();
+    const hasServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const storageClient = hasServiceRole ? getSupabaseServiceRoleClient() : supabase;
     const bucket = process.env.SUPABASE_STORAGE_BUCKET || "attachments";
-    const clerk = await clerkClient();
+    const clerk = hasServiceRole ? await clerkClient() : null;
 
     const { data: projectRows, error: projectError } = await supabase
       .from("Projects")
@@ -258,7 +259,7 @@ async function fetchPotteryProjects(currentMaker: CurrentMaker): Promise<{ proje
       };
     });
 
-    if (makerIds.length) {
+    if (makerIds.length && hasServiceRole) {
       await Promise.all(
         makerIds.map(async (makerId) => {
           if (makerLookup.has(makerId)) {
@@ -289,7 +290,7 @@ async function fetchPotteryProjects(currentMaker: CurrentMaker): Promise<{ proje
               name = currentMaker.makerName ?? undefined;
             }
 
-            if (clerkUserId) {
+            if (clerkUserId && clerk) {
               try {
                 const clerkUser = await clerk.users.getUser(clerkUserId);
                 const safeClerkUsername =
