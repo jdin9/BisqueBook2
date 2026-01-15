@@ -63,8 +63,9 @@ export default function Home() {
   return (
     <div className="space-y-12">
       <WelcomeModal />
-      <section className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-[#f3e8ff] via-background to-[#e0e7ff] px-8 py-12 shadow-2xl sm:px-10">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(168,85,247,0.18),transparent_42%),radial-gradient(circle_at_82%_12%,rgba(99,102,241,0.16),transparent_42%),radial-gradient(circle_at_18%_84%,rgba(236,72,153,0.12),transparent_40%)]" />
+      <section className="relative overflow-hidden rounded-3xl border border-white/60 bg-gradient-to-br from-white/80 via-white/70 to-[#eef2ff]/80 px-8 py-12 shadow-[0_35px_120px_-55px_rgba(99,102,241,0.45)] backdrop-blur sm:px-10">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(129,140,248,0.2),transparent_45%),radial-gradient(circle_at_82%_12%,rgba(232,121,249,0.15),transparent_45%),radial-gradient(circle_at_18%_84%,rgba(129,140,248,0.12),transparent_40%)]" />
+        <div className="pointer-events-none absolute inset-y-6 right-6 hidden w-[38%] rounded-[36px] border border-white/50 bg-white/30 blur-2xl lg:block" />
         <div className="relative grid gap-8 lg:grid-cols-2 lg:items-center">
           <div className="space-y-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-white/70 px-3 py-1 text-sm font-medium text-primary shadow-sm backdrop-blur">
@@ -74,11 +75,11 @@ export default function Home() {
             <div className="space-y-3">
               <p className="text-sm font-semibold text-primary/90">Scaffolded for Vercel, polished for your team</p>
               <h1 className="text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
-                Next.js App Router starter with Clerk, Prisma, and Supabase storage
+                A modern starter kit for Clerk, Prisma, and Supabase storage
               </h1>
               <p className="max-w-2xl text-lg text-muted-foreground">
-                Ship faster with batteries included: authentication, protected routes, database schema, migration scripts,
-                and storage client utilities are wired up for both local development and cloud deployment.
+                Launch faster with refined UI defaults, protected routes, schema-ready migrations, and storage utilities that
+                feel production-ready from day one.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -110,9 +111,21 @@ export default function Home() {
                 </div>
               ))}
             </div>
+            <div className="grid gap-4 rounded-2xl border border-white/70 bg-white/70 px-4 py-3 text-sm text-muted-foreground shadow-sm backdrop-blur sm:grid-cols-3">
+              {[
+                { label: "Setup time", value: "15 min" },
+                { label: "Starter routes", value: "20+" },
+                { label: "Deploy target", value: "Vercel" },
+              ].map((stat) => (
+                <div key={stat.label} className="space-y-1">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground/80">{stat.label}</p>
+                  <p className="text-base font-semibold text-foreground">{stat.value}</p>
+                </div>
+              ))}
+            </div>
           </div>
-          <Card className="relative border-primary/20 bg-white/80 shadow-xl backdrop-blur">
-            <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-[#f3e8ff] via-transparent to-[#e0e7ff]" />
+          <Card className="relative border-white/60 bg-white/80 shadow-xl backdrop-blur">
+            <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-[#eef2ff] via-transparent to-[#f5f3ff]" />
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5 text-primary" /> Deployment checklist
@@ -154,11 +167,11 @@ export default function Home() {
           {features.map((feature) => (
             <Card
               key={feature.title}
-              className="group relative h-full overflow-hidden border-primary/10 bg-gradient-to-br from-white via-white to-[#f4f0ff] shadow-sm backdrop-blur transition hover:-translate-y-1 hover:shadow-lg"
+              className="group relative h-full overflow-hidden border-white/60 bg-white/70 shadow-sm backdrop-blur transition hover:-translate-y-1 hover:shadow-lg"
             >
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#f3e8ff] via-transparent to-[#e0e7ff] opacity-0 transition group-hover:opacity-100" />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#eef2ff] via-transparent to-[#f5f3ff] opacity-0 transition group-hover:opacity-100" />
               <CardHeader className="space-y-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-[#f3e8ff] text-primary">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-[#eef2ff] text-primary shadow-sm">
                   <feature.icon className="h-5 w-5" />
                 </div>
                 <CardTitle>{feature.title}</CardTitle>
@@ -187,9 +200,9 @@ export default function Home() {
           {pages.map((page) => (
             <Card
               key={page.title}
-              className="relative h-full overflow-hidden border-primary/10 bg-gradient-to-br from-[#f3e8ff] via-white to-[#e0e7ff] shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+              className="relative h-full overflow-hidden border-white/60 bg-white/70 shadow-sm backdrop-blur transition hover:-translate-y-1 hover:shadow-md"
             >
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(168,85,247,0.18),transparent_40%),radial-gradient(circle_at_82%_10%,rgba(129,140,248,0.14),transparent_40%)]" />
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(129,140,248,0.18),transparent_40%),radial-gradient(circle_at_82%_10%,rgba(232,121,249,0.14),transparent_40%)]" />
               <CardHeader className="relative">
                 <CardTitle>{page.title}</CardTitle>
                 <CardDescription>{page.description}</CardDescription>
