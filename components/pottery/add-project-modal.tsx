@@ -37,9 +37,10 @@ export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
       </Button>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-          <div className="w-full max-w-2xl rounded-2xl border bg-background shadow-2xl">
-            <div className="flex items-start justify-between border-b px-6 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-4 backdrop-blur-sm">
+          <div className="glass-panel relative w-full max-w-2xl overflow-hidden">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(129,140,248,0.2),transparent_45%),radial-gradient(circle_at_85%_20%,rgba(232,121,249,0.18),transparent_42%)]" />
+            <div className="relative flex items-start justify-between border-b border-white/50 bg-white/60 px-6 py-4 backdrop-blur">
               <div>
                 <h2 className="text-lg font-semibold">Add a pottery project</h2>
                 <p className="text-sm text-muted-foreground">
@@ -52,7 +53,7 @@ export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
             </div>
 
             <form
-              className="space-y-4 px-6 py-5"
+              className="relative space-y-4 px-6 py-5"
               onSubmit={async (event: FormEvent<HTMLFormElement>) => {
                 event.preventDefault();
                 setState({ status: "submitting" });
@@ -104,7 +105,7 @@ export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
                     name="projectName"
                     required
                     placeholder="Ex: Stoneware dinner plate set"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    className="w-full rounded-md border border-white/60 bg-white/70 px-3 py-2 text-sm shadow-sm transition focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </label>
 
@@ -114,7 +115,7 @@ export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
                     name="clayId"
                     required
                     defaultValue=""
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    className="w-full rounded-md border border-white/60 bg-white/70 px-3 py-2 text-sm shadow-sm transition focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/20"
                   >
                     <option value="" disabled>
                       Select a clay body
@@ -140,7 +141,7 @@ export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
                   name="makerName"
                   value={makerName ?? "Not signed in"}
                   readOnly
-                  className="w-full rounded-md border border-input bg-muted/60 px-3 py-2 text-sm text-muted-foreground shadow-sm"
+                  className="w-full rounded-md border border-white/60 bg-white/60 px-3 py-2 text-sm text-muted-foreground shadow-sm"
                 />
                 {!makerName && <span className="text-xs text-muted-foreground">Sign in to attach your name.</span>}
               </label>
@@ -151,7 +152,7 @@ export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
                   name="notes"
                   rows={4}
                   placeholder="Firing schedule, glaze plans, form details..."
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="w-full rounded-md border border-white/60 bg-white/70 px-3 py-2 text-sm shadow-sm transition focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
               </label>
 
@@ -163,7 +164,7 @@ export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
                   accept="image/*"
                   multiple
                   onChange={(event) => setPhotoCount(event.target.files?.length ?? 0)}
-                  className="w-full cursor-pointer rounded-md border border-dashed border-input bg-background px-3 py-4 text-sm shadow-sm transition hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                  className="w-full cursor-pointer rounded-md border border-dashed border-white/60 bg-white/70 px-3 py-4 text-sm shadow-sm transition hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
                 />
                 <p className="text-xs text-muted-foreground">
                   Upload progress shots or reference images (you can select multiple). {photoCount ? `${photoCount} file${photoCount > 1 ? "s" : ""} selected.` : ""}
@@ -181,7 +182,7 @@ export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
                 </div>
               )}
 
-              <div className="flex items-center justify-between border-t pt-4">
+              <div className="flex items-center justify-between border-t border-white/50 pt-4">
                 <div className="text-xs text-muted-foreground">
                   Need the full admin view?{" "}
                   <Link href="/admin" className="inline-flex items-center gap-1 text-primary hover:underline">

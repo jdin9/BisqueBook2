@@ -53,9 +53,10 @@ export function CreateProjectDialog({ action, clays, makerName, canSubmit, unava
       </div>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-start justify-between border-b px-6 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-4 backdrop-blur-sm">
+          <div className="glass-panel relative w-full max-w-lg overflow-hidden">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(129,140,248,0.2),transparent_45%),radial-gradient(circle_at_80%_10%,rgba(232,121,249,0.18),transparent_42%)]" />
+            <div className="relative flex items-start justify-between border-b border-white/50 bg-white/60 px-6 py-4 backdrop-blur">
               <div>
                 <h3 className="text-lg font-semibold">Add project</h3>
                 <p className="text-sm text-muted-foreground">Log a new project for your studio.</p>
@@ -70,10 +71,16 @@ export function CreateProjectDialog({ action, clays, makerName, canSubmit, unava
               </button>
             </div>
 
-            <form ref={formRef} action={formAction} className="space-y-4 px-6 py-5">
+            <form ref={formRef} action={formAction} className="relative space-y-4 px-6 py-5">
               <div className="space-y-2">
                 <Label htmlFor="title">Title</Label>
-                <Input id="title" name="title" required placeholder="Ex: Stoneware dinner plate set" />
+                <Input
+                  id="title"
+                  name="title"
+                  required
+                  placeholder="Ex: Stoneware dinner plate set"
+                  className="border-white/60 bg-white/70"
+                />
               </div>
 
               <div className="space-y-2">
@@ -81,7 +88,7 @@ export function CreateProjectDialog({ action, clays, makerName, canSubmit, unava
                 <select
                   id="clayId"
                   name="clayId"
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-md border border-white/60 bg-white/70 px-3 py-2 text-sm shadow-sm transition focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                   defaultValue=""
                   disabled={!clays.length}
                 >
@@ -103,14 +110,21 @@ export function CreateProjectDialog({ action, clays, makerName, canSubmit, unava
                   id="notes"
                   name="notes"
                   rows={4}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="w-full rounded-md border border-white/60 bg-white/70 px-3 py-2 text-sm shadow-sm transition focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/20"
                   placeholder="Firing schedule, form details, glaze plans..."
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="maker">Maker</Label>
-                <Input id="maker" name="maker" value={makerName ?? "Not signed in"} disabled readOnly />
+                <Input
+                  id="maker"
+                  name="maker"
+                  value={makerName ?? "Not signed in"}
+                  disabled
+                  readOnly
+                  className="border-white/60 bg-white/60"
+                />
                 {!makerName && (
                   <p className="text-xs text-muted-foreground">Sign in to log a project under your name.</p>
                 )}
