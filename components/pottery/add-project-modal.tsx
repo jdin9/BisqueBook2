@@ -86,7 +86,6 @@ export function AddProjectModal({ clays, makerName }: AddProjectModalProps) {
                   setPhotoCount(0);
                   setState({ status: "success" });
                   setOpen(false);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
                   router.refresh();
                 } catch (error) {
                   console.error("Failed to save pottery project", error);
