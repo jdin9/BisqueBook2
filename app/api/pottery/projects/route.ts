@@ -38,6 +38,20 @@ export async function POST(request: Request) {
     const bucket = process.env.SUPABASE_STORAGE_BUCKET || "attachments";
     await ensureStorageBucketExists(bucket);
 
+    const { data: clayRow, error: clayLookupError } = await supabase
+      .from("Clays")
+      .select("studio_name")
+      .eq("id", clayId)
+      .single();
+
+    if (clayLookupError || !clayRow?.studio_name) {
+      console.error("Unable to resolve project studio from clay", clayLookupError);
+      return NextResponse.json(
+        { error: "Unable to save project because the selected clay is not linked to a studio." },
+        { status: 400 },
+      );
+    }
+
     const { data: existingUsers, error: listUsersError } = await supabase.auth.admin.listUsers();
 
     if (listUsersError) {
@@ -80,7 +94,7 @@ export async function POST(request: Request) {
 
     const { data: projectInsert, error: projectError } = await supabase
       .from("Projects")
-      .insert({ title, clay_id: clayId, user_id: supabaseUserId, notes })
+      .insert({ title, clay_id: clayId, user_id: supabaseUserId, notes, studio_name: clayRow.studio_name })
       .select("id")
       .single();
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useUser } from "@clerk/nextjs";
 import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +34,12 @@ type GlazeRecord = {
   glaze_name: string;
   brand: string;
   status: Status;
+};
+
+type StudioRecord = {
+  id: string;
+  name: string;
+  admin_user_id: string;
 };
 
 const coneChart = [
@@ -75,6 +82,7 @@ const selectClassName =
   "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
 export default function AdminPage() {
+  const { user } = useUser();
   const [kilnType, setKilnType] = useState<KilnType>("digital");
   const [kilnControls, setKilnControls] = useState<KilnControls>("switches");
   const [kilnIdentifier, setKilnIdentifier] = useState("");
@@ -108,6 +116,16 @@ export default function AdminPage() {
   const [isSubmittingClay, setIsSubmittingClay] = useState(false);
   const [isSubmittingGlaze, setIsSubmittingGlaze] = useState(false);
 
+  const [studios, setStudios] = useState<StudioRecord[]>([]);
+  const [activeStudioName, setActiveStudioName] = useState<string | null>(null);
+  const [joinStudioName, setJoinStudioName] = useState("");
+  const [joinStudioPassword, setJoinStudioPassword] = useState("");
+  const [newStudioName, setNewStudioName] = useState("");
+  const [newStudioPassword, setNewStudioPassword] = useState("");
+  const [studioError, setStudioError] = useState<string | null>(null);
+  const [studioSuccess, setStudioSuccess] = useState<string | null>(null);
+  const [isSubmittingStudio, setIsSubmittingStudio] = useState(false);
+
   const supabase = useMemo(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -128,6 +146,39 @@ export default function AdminPage() {
 
   const isMissingTable = (error: { code?: string; message?: string } | null) =>
     Boolean(error?.code === "42P01" || error?.message?.toLowerCase().includes("relation"));
+
+
+  const activeStudio = useMemo(
+    () => studios.find((studio) => studio.name === activeStudioName) ?? null,
+    [studios, activeStudioName],
+  );
+  const isActiveStudioAdmin = Boolean(activeStudio && user?.id && activeStudio.admin_user_id === user.id);
+  const canManageStudioResources = Boolean(activeStudioName && isActiveStudioAdmin);
+
+  const fetchStudios = useCallback(async () => {
+    setStudioError(null);
+
+    const { data, error } = await supabase.from("Studios").select("id, name, admin_user_id").order("name");
+
+    if (error) {
+      setStudioError(
+        isMissingTable(error)
+          ? "Studios table not found. For existing projects, run supabase/existing_project_studio_migration.sql in Supabase SQL editor."
+          : "Unable to load studios. Please try again.",
+      );
+      return;
+    }
+
+    const loadedStudios = (data as StudioRecord[]) || [];
+    setStudios(loadedStudios);
+
+    if (activeStudioName && loadedStudios.some((studio) => studio.name === activeStudioName)) {
+      return;
+    }
+
+    const ownedStudio = loadedStudios.find((studio) => studio.admin_user_id === user?.id);
+    setActiveStudioName(ownedStudio?.name ?? null);
+  }, [activeStudioName, supabase, user?.id]);
 
   const handleDialSettingChange = (index: number, value: string) => {
     const updated = [...dialSettings];
@@ -168,9 +219,16 @@ export default function AdminPage() {
     setIsLoadingKilns(true);
     setKilnError(null);
 
+    if (!activeStudioName) {
+      setKilns([]);
+      setIsLoadingKilns(false);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("Kilns")
       .select("id, kiln_id, kiln_type, controls, dial_settings, switch_count, status")
+      .eq("studio_name", activeStudioName)
       .order("kiln_id", { ascending: true });
 
     if (error) {
@@ -185,15 +243,22 @@ export default function AdminPage() {
 
     setKilns((data as KilnRecord[]) || []);
     setIsLoadingKilns(false);
-  }, [supabase]);
+  }, [activeStudioName, supabase]);
 
   const fetchClays = useCallback(async () => {
     setIsLoadingClays(true);
     setClayError(null);
 
+    if (!activeStudioName) {
+      setClays([]);
+      setIsLoadingClays(false);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("Clays")
       .select("id, clay_body, status")
+      .eq("studio_name", activeStudioName)
       .order("clay_body", { ascending: true });
 
     if (error) {
@@ -208,15 +273,22 @@ export default function AdminPage() {
 
     setClays((data as ClayRecord[]) || []);
     setIsLoadingClays(false);
-  }, [supabase]);
+  }, [activeStudioName, supabase]);
 
   const fetchGlazes = useCallback(async () => {
     setIsLoadingGlazes(true);
     setGlazeError(null);
 
+    if (!activeStudioName) {
+      setGlazes([]);
+      setIsLoadingGlazes(false);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("Glazes")
       .select("id, glaze_name, brand, status")
+      .eq("studio_name", activeStudioName)
       .order("glaze_name", { ascending: true });
 
     if (error) {
@@ -231,19 +303,109 @@ export default function AdminPage() {
 
     setGlazes((data as GlazeRecord[]) || []);
     setIsLoadingGlazes(false);
-  }, [supabase]);
+  }, [activeStudioName, supabase]);
+
+  const handleJoinStudio = async () => {
+    setStudioError(null);
+    setStudioSuccess(null);
+
+    const trimmedName = joinStudioName.trim();
+    const trimmedPassword = joinStudioPassword.trim();
+
+    if (!trimmedName || !trimmedPassword) {
+      setStudioError("Studio name and password are required to join.");
+      return;
+    }
+
+    setIsSubmittingStudio(true);
+
+    const { data, error } = await supabase
+      .from("Studios")
+      .select("name, admin_user_id")
+      .eq("name", trimmedName)
+      .eq("password", trimmedPassword)
+      .single();
+
+    if (error || !data) {
+      setStudioError("Studio name/password did not match. Please try again.");
+      setIsSubmittingStudio(false);
+      return;
+    }
+
+    setActiveStudioName(trimmedName);
+    setStudioSuccess(
+      data.admin_user_id === user?.id
+        ? `Using your admin studio: ${trimmedName}`
+        : `Joined studio: ${trimmedName}. Kiln and Pottery admin settings are only available to this studio admin.`,
+    );
+    setJoinStudioPassword("");
+    setIsSubmittingStudio(false);
+  };
+
+  const handleCreateStudio = async () => {
+    setStudioError(null);
+    setStudioSuccess(null);
+
+    const trimmedName = newStudioName.trim();
+    const trimmedPassword = newStudioPassword.trim();
+
+    if (!trimmedName || !trimmedPassword) {
+      setStudioError("Studio name and password are required to create a studio.");
+      return;
+    }
+
+    if (!user?.id) {
+      setStudioError("You must be signed in to create a studio.");
+      return;
+    }
+
+    setIsSubmittingStudio(true);
+
+    const { error } = await supabase.from("Studios").insert({
+      name: trimmedName,
+      password: trimmedPassword,
+      admin_user_id: user.id,
+    });
+
+    if (error) {
+      setStudioError(
+        error.code === "23505"
+          ? "That studio name is already taken. Please choose a different name."
+          : "Unable to create studio right now. Please try again.",
+      );
+      setIsSubmittingStudio(false);
+      return;
+    }
+
+    setStudioSuccess(`Studio created: ${trimmedName}`);
+    setActiveStudioName(trimmedName);
+    setJoinStudioName(trimmedName);
+    setNewStudioName("");
+    setNewStudioPassword("");
+    await fetchStudios();
+    setIsSubmittingStudio(false);
+  };
 
   // We need to populate Supabase-backed admin tables on mount; state updates are contained within each fetch helper.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
+    void fetchStudios();
+  }, [fetchStudios]);
+
+  useEffect(() => {
     void fetchKilns();
     void fetchClays();
     void fetchGlazes();
-  }, [fetchKilns, fetchClays, fetchGlazes]);
+  }, [fetchKilns, fetchClays, fetchGlazes, activeStudioName]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleKilnSubmit = async () => {
     setKilnError(null);
+
+    if (!activeStudioName) {
+      setKilnError("Join or create a studio first.");
+      return;
+    }
 
     const trimmedIdentifier = kilnIdentifier.trim();
     if (!trimmedIdentifier) {
@@ -280,10 +442,11 @@ export default function AdminPage() {
       dial_settings: kilnType === "manual" && kilnControls === "dials" ? cleanedDialSettings : null,
       switch_count: kilnType === "manual" && kilnControls === "switches" ? Number(switchCount) : null,
       status: kilnStatus,
-    } satisfies Omit<KilnRecord, "id">;
+      studio_name: activeStudioName,
+    };
 
     const { error } = editingKilnId
-      ? await supabase.from("Kilns").update(payload).eq("id", editingKilnId)
+      ? await supabase.from("Kilns").update(payload).eq("id", editingKilnId).eq("studio_name", activeStudioName)
       : await supabase.from("Kilns").insert(payload);
 
     if (error) {
@@ -322,6 +485,11 @@ export default function AdminPage() {
   const handleClaySubmit = async () => {
     setClayError(null);
 
+    if (!activeStudioName) {
+      setClayError("Join or create a studio first.");
+      return;
+    }
+
     const trimmedBody = clayBody.trim();
     if (!trimmedBody) {
       setClayError("Clay body is required.");
@@ -332,7 +500,7 @@ export default function AdminPage() {
 
     const { error } = await supabase
       .from("Clays")
-      .insert({ clay_body: trimmedBody, status: clayStatus } satisfies Omit<ClayRecord, "id">);
+      .insert({ clay_body: trimmedBody, status: clayStatus, studio_name: activeStudioName });
 
     if (error) {
       setClayError(
@@ -352,6 +520,11 @@ export default function AdminPage() {
   const handleGlazeSubmit = async () => {
     setGlazeError(null);
 
+    if (!activeStudioName) {
+      setGlazeError("Join or create a studio first.");
+      return;
+    }
+
     const trimmedName = glazeName.trim();
     const trimmedBrand = glazeBrand.trim();
 
@@ -364,7 +537,7 @@ export default function AdminPage() {
 
     const { error } = await supabase
       .from("Glazes")
-      .insert({ glaze_name: trimmedName, brand: trimmedBrand, status: glazeStatus } satisfies Omit<GlazeRecord, "id">);
+      .insert({ glaze_name: trimmedName, brand: trimmedBrand, status: glazeStatus, studio_name: activeStudioName });
 
     if (error) {
       setGlazeError(
@@ -383,7 +556,7 @@ export default function AdminPage() {
 
   const toggleKilnStatus = async (kiln: KilnRecord) => {
     const nextStatus: Status = kiln.status === "active" ? "retired" : "active";
-    const { error } = await supabase.from("Kilns").update({ status: nextStatus }).eq("id", kiln.id);
+    const { error } = await supabase.from("Kilns").update({ status: nextStatus }).eq("id", kiln.id).eq("studio_name", activeStudioName);
 
     if (error) {
       setKilnError("Unable to update kiln status. Please try again.");
@@ -396,7 +569,7 @@ export default function AdminPage() {
 
   const toggleClayStatus = async (clay: ClayRecord) => {
     const nextStatus: Status = clay.status === "active" ? "retired" : "active";
-    const { error } = await supabase.from("Clays").update({ status: nextStatus }).eq("id", clay.id);
+    const { error } = await supabase.from("Clays").update({ status: nextStatus }).eq("id", clay.id).eq("studio_name", activeStudioName);
 
     if (error) {
       setClayError("Unable to update clay status. Please try again.");
@@ -408,7 +581,7 @@ export default function AdminPage() {
 
   const toggleGlazeStatus = async (glaze: GlazeRecord) => {
     const nextStatus: Status = glaze.status === "active" ? "retired" : "active";
-    const { error } = await supabase.from("Glazes").update({ status: nextStatus }).eq("id", glaze.id);
+    const { error } = await supabase.from("Glazes").update({ status: nextStatus }).eq("id", glaze.id).eq("studio_name", activeStudioName);
 
     if (error) {
       setGlazeError("Unable to update glaze status. Please try again.");
@@ -431,28 +604,133 @@ export default function AdminPage() {
       <Tabs defaultValue="studio">
         <TabsList>
           <TabsTrigger value="studio">Studio</TabsTrigger>
-          <TabsTrigger value="kiln">Kiln</TabsTrigger>
-          <TabsTrigger value="pottery">Pottery</TabsTrigger>
+          {canManageStudioResources ? <TabsTrigger value="kiln">Kiln</TabsTrigger> : null}
+          {canManageStudioResources ? <TabsTrigger value="pottery">Pottery</TabsTrigger> : null}
         </TabsList>
 
         <TabsContent value="studio" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Studio access</CardTitle>
-              <CardDescription>Define shared details for sign-ins around the studio.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="studio-name">Studio Name</Label>
-                <Input id="studio-name" placeholder="Enter studio name" />
-              </div>
+          <Tabs defaultValue="join-studio" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="join-studio">Join an existing studio</TabsTrigger>
+              <TabsTrigger value="start-studio">Start a new studio</TabsTrigger>
+            </TabsList>
 
-              <div className="space-y-2">
-                <Label htmlFor="studio-password">Studio Password</Label>
-                <Input id="studio-password" type="password" placeholder="Enter studio password" />
-              </div>
-            </CardContent>
-          </Card>
+            <TabsContent value="join-studio">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Join an existing studio</CardTitle>
+                  <CardDescription>Use the studio credentials shared by your studio admin.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {studioError ? (
+                    <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                      {studioError}
+                    </div>
+                  ) : null}
+                  {studioSuccess ? (
+                    <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700">
+                      {studioSuccess}
+                    </div>
+                  ) : null}
+
+                  <div className="rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">Active studio:</span>{" "}
+                    <span className="font-medium">{activeStudioName ?? "None selected"}</span>
+                  </div>
+
+                  <div className="rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">Admin access:</span>{" "}
+                    <span className="font-medium">
+                      {canManageStudioResources
+                        ? "You can manage kiln and pottery admin settings for this studio."
+                        : "Only the studio admin can manage kiln and pottery settings."}
+                    </span>
+                  </div>
+
+                  {studios.length ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="existing-studio-picker">Available studios</Label>
+                      <select
+                        id="existing-studio-picker"
+                        className={selectClassName}
+                        value={activeStudioName ?? ""}
+                        onChange={(event) => setActiveStudioName(event.target.value || null)}
+                      >
+                        <option value="" disabled>
+                          Select a studio
+                        </option>
+                        {studios.map((studio) => (
+                          <option key={studio.id} value={studio.name}>
+                            {studio.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : null}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="join-studio-name">Studio Name</Label>
+                    <Input
+                      id="join-studio-name"
+                      placeholder="Enter studio name"
+                      value={joinStudioName}
+                      onChange={(event) => setJoinStudioName(event.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="join-studio-password">Studio Password</Label>
+                    <Input
+                      id="join-studio-password"
+                      type="password"
+                      placeholder="Enter studio password"
+                      value={joinStudioPassword}
+                      onChange={(event) => setJoinStudioPassword(event.target.value)}
+                    />
+                  </div>
+
+                  <Button type="button" onClick={() => void handleJoinStudio()} disabled={isSubmittingStudio}>
+                    {isSubmittingStudio ? "Joining..." : "Join studio"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="start-studio">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Start a new studio</CardTitle>
+                  <CardDescription>Create a new studio space and set an initial access password.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-studio-name">Studio Name</Label>
+                    <Input
+                      id="new-studio-name"
+                      placeholder="Enter a new studio name"
+                      value={newStudioName}
+                      onChange={(event) => setNewStudioName(event.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="new-studio-password">Studio Password</Label>
+                    <Input
+                      id="new-studio-password"
+                      type="password"
+                      placeholder="Create a studio password"
+                      value={newStudioPassword}
+                      onChange={(event) => setNewStudioPassword(event.target.value)}
+                    />
+                  </div>
+
+                  <Button type="button" onClick={() => void handleCreateStudio()} disabled={isSubmittingStudio}>
+                    {isSubmittingStudio ? "Creating..." : "Create studio"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="kiln" className="space-y-4">
@@ -700,7 +978,7 @@ export default function AdminPage() {
                   <div className="text-sm text-muted-foreground">
                     Kiln ID, type, and status are required. Manual kilns need controls and either switch counts or dial settings.
                   </div>
-                  <Button type="button" onClick={() => void handleKilnSubmit()} disabled={isSubmittingKiln}>
+                  <Button type="button" onClick={() => void handleKilnSubmit()} disabled={isSubmittingKiln || !canManageStudioResources}>
                     {isSubmittingKiln ? (editingKilnId ? "Saving..." : "Adding...") : editingKilnId ? "Save changes" : "Add kiln"}
                   </Button>
                 </div>
@@ -804,7 +1082,7 @@ export default function AdminPage() {
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-muted-foreground">Clay body and status are required.</p>
-                  <Button type="button" onClick={() => void handleClaySubmit()} disabled={isSubmittingClay}>
+                  <Button type="button" onClick={() => void handleClaySubmit()} disabled={isSubmittingClay || !canManageStudioResources}>
                     {isSubmittingClay ? "Adding..." : "Add clay"}
                   </Button>
                 </div>
@@ -892,7 +1170,7 @@ export default function AdminPage() {
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-muted-foreground">Glaze name, brand, and status are required.</p>
-                  <Button type="button" onClick={() => void handleGlazeSubmit()} disabled={isSubmittingGlaze}>
+                  <Button type="button" onClick={() => void handleGlazeSubmit()} disabled={isSubmittingGlaze || !canManageStudioResources}>
                     {isSubmittingGlaze ? "Adding..." : "Add glaze"}
                   </Button>
                 </div>
