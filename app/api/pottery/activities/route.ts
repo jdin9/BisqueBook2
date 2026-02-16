@@ -60,7 +60,7 @@ export async function POST(request: Request) {
       .eq("id", projectId)
       .single();
 
-    if (projectLookupError) {
+    if (projectLookupError || !projectLookup?.studio_name) {
       console.error("Failed to look up project studio", projectLookupError);
       return NextResponse.json({ error: "Unable to resolve project studio." }, { status: 500 });
     }
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
         coats: type === "glaze" ? coats : null,
         cone: type === "fire" ? cone : null,
         notes,
-        studio_name: (projectLookup?.studio_name as string | null) ?? null,
+        studio_name: projectLookup.studio_name as string,
       })
       .select("id, created_at")
       .single();

@@ -39,7 +39,6 @@ type GlazeRecord = {
 type StudioRecord = {
   id: string;
   name: string;
-  password: string;
   admin_user_id: string;
 };
 
@@ -149,12 +148,17 @@ export default function AdminPage() {
     Boolean(error?.code === "42P01" || error?.message?.toLowerCase().includes("relation"));
 
 
-  const canManageStudioResources = Boolean(activeStudioName);
+  const activeStudio = useMemo(
+    () => studios.find((studio) => studio.name === activeStudioName) ?? null,
+    [studios, activeStudioName],
+  );
+  const isActiveStudioAdmin = Boolean(activeStudio && user?.id && activeStudio.admin_user_id === user.id);
+  const canManageStudioResources = Boolean(activeStudioName && isActiveStudioAdmin);
 
   const fetchStudios = useCallback(async () => {
     setStudioError(null);
 
-    const { data, error } = await supabase.from("Studios").select("id, name, password, admin_user_id").order("name");
+    const { data, error } = await supabase.from("Studios").select("id, name, admin_user_id").order("name");
 
     if (error) {
       setStudioError(
@@ -172,8 +176,9 @@ export default function AdminPage() {
       return;
     }
 
-    setActiveStudioName(loadedStudios[0]?.name ?? null);
-  }, [activeStudioName, supabase]);
+    const ownedStudio = loadedStudios.find((studio) => studio.admin_user_id === user?.id);
+    setActiveStudioName(ownedStudio?.name ?? null);
+  }, [activeStudioName, supabase, user?.id]);
 
   const handleDialSettingChange = (index: number, value: string) => {
     const updated = [...dialSettings];
@@ -316,7 +321,7 @@ export default function AdminPage() {
 
     const { data, error } = await supabase
       .from("Studios")
-      .select("name")
+      .select("name, admin_user_id")
       .eq("name", trimmedName)
       .eq("password", trimmedPassword)
       .single();
@@ -328,7 +333,11 @@ export default function AdminPage() {
     }
 
     setActiveStudioName(trimmedName);
-    setStudioSuccess(`Joined studio: ${trimmedName}`);
+    setStudioSuccess(
+      data.admin_user_id === user?.id
+        ? `Using your admin studio: ${trimmedName}`
+        : `Joined studio: ${trimmedName}. Kiln and Pottery admin settings are only available to this studio admin.`,
+    );
     setJoinStudioPassword("");
     setIsSubmittingStudio(false);
   };
@@ -595,8 +604,8 @@ export default function AdminPage() {
       <Tabs defaultValue="studio">
         <TabsList>
           <TabsTrigger value="studio">Studio</TabsTrigger>
-          <TabsTrigger value="kiln">Kiln</TabsTrigger>
-          <TabsTrigger value="pottery">Pottery</TabsTrigger>
+          {canManageStudioResources ? <TabsTrigger value="kiln">Kiln</TabsTrigger> : null}
+          {canManageStudioResources ? <TabsTrigger value="pottery">Pottery</TabsTrigger> : null}
         </TabsList>
 
         <TabsContent value="studio" className="space-y-4">
@@ -627,6 +636,15 @@ export default function AdminPage() {
                   <div className="rounded-lg border bg-muted/20 px-3 py-2 text-sm">
                     <span className="text-muted-foreground">Active studio:</span>{" "}
                     <span className="font-medium">{activeStudioName ?? "None selected"}</span>
+                  </div>
+
+                  <div className="rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">Admin access:</span>{" "}
+                    <span className="font-medium">
+                      {canManageStudioResources
+                        ? "You can manage kiln and pottery admin settings for this studio."
+                        : "Only the studio admin can manage kiln and pottery settings."}
+                    </span>
                   </div>
 
                   {studios.length ? (
