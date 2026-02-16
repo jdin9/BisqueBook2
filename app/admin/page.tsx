@@ -42,6 +42,12 @@ type StudioRecord = {
   admin_user_id: string;
 };
 
+type StudioMembershipRecord = {
+  user_id: string;
+  studio_name: string;
+  role: "admin" | "member";
+};
+
 const coneChart = [
   { cone: "Cone 10", temperature: "2381°F" },
   { cone: "Cone 9", temperature: "2336°F" },
@@ -125,6 +131,7 @@ export default function AdminPage() {
   const [studioError, setStudioError] = useState<string | null>(null);
   const [studioSuccess, setStudioSuccess] = useState<string | null>(null);
   const [isSubmittingStudio, setIsSubmittingStudio] = useState(false);
+  const [studioMembership, setStudioMembership] = useState<StudioMembershipRecord | null>(null);
 
   const supabase = useMemo(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -152,8 +159,42 @@ export default function AdminPage() {
     () => studios.find((studio) => studio.name === activeStudioName) ?? null,
     [studios, activeStudioName],
   );
+  const ownedStudio = useMemo(() => studios.find((studio) => studio.admin_user_id === user?.id) ?? null, [studios, user?.id]);
   const isActiveStudioAdmin = Boolean(activeStudio && user?.id && activeStudio.admin_user_id === user.id);
   const canManageStudioResources = Boolean(activeStudioName && isActiveStudioAdmin);
+  const hasLockedStudioMembership = Boolean(studioMembership?.studio_name);
+
+  const fetchStudioMembership = useCallback(async () => {
+    if (!user?.id) {
+      setStudioMembership(null);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("StudioMembers")
+      .select("user_id, studio_name, role")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      if (error.code === "42P01") {
+        setStudioError(
+          "StudioMembers table not found. Run supabase/existing_project_studio_migration.sql in Supabase SQL editor.",
+        );
+      }
+      setStudioMembership(null);
+      return;
+    }
+
+    setStudioMembership((data as StudioMembershipRecord | null) ?? null);
+    if (data?.studio_name) {
+      setActiveStudioName(data.studio_name);
+      setJoinStudioName(data.studio_name);
+      if (data.role === "admin") {
+        setNewStudioName(data.studio_name);
+      }
+    }
+  }, [supabase, user]);
 
   const fetchStudios = useCallback(async () => {
     setStudioError(null);
@@ -176,9 +217,21 @@ export default function AdminPage() {
       return;
     }
 
-    const ownedStudio = loadedStudios.find((studio) => studio.admin_user_id === user?.id);
-    setActiveStudioName(ownedStudio?.name ?? null);
-  }, [activeStudioName, supabase, user?.id]);
+    const owned = loadedStudios.find((studio) => studio.admin_user_id === user?.id);
+    if (owned?.name) {
+      setActiveStudioName(owned.name);
+      setNewStudioName(owned.name);
+      return;
+    }
+
+    if (studioMembership?.studio_name && loadedStudios.some((studio) => studio.name === studioMembership.studio_name)) {
+      setActiveStudioName(studioMembership.studio_name);
+      setJoinStudioName(studioMembership.studio_name);
+      return;
+    }
+
+    setActiveStudioName(null);
+  }, [activeStudioName, studioMembership, supabase, user]);
 
   const handleDialSettingChange = (index: number, value: string) => {
     const updated = [...dialSettings];
@@ -317,6 +370,16 @@ export default function AdminPage() {
       return;
     }
 
+    if (!user?.id) {
+      setStudioError("You must be signed in to join a studio.");
+      return;
+    }
+
+    if (hasLockedStudioMembership && studioMembership?.studio_name !== trimmedName) {
+      setStudioError(`Your account is already linked to ${studioMembership?.studio_name}. Only one studio is allowed per account.`);
+      return;
+    }
+
     setIsSubmittingStudio(true);
 
     const { data, error } = await supabase
@@ -332,12 +395,30 @@ export default function AdminPage() {
       return;
     }
 
+    const role: "admin" | "member" = data.admin_user_id === user?.id ? "admin" : "member";
+    const { error: membershipError } = await supabase.from("StudioMembers").upsert(
+      {
+        user_id: user.id,
+        studio_name: trimmedName,
+        role,
+      },
+      { onConflict: "user_id" },
+    );
+
+    if (membershipError) {
+      setStudioError("Joined studio, but failed to save account studio membership.");
+      setIsSubmittingStudio(false);
+      return;
+    }
+
+    setStudioMembership({ user_id: user.id, studio_name: trimmedName, role });
     setActiveStudioName(trimmedName);
     setStudioSuccess(
-      data.admin_user_id === user?.id
+      role === "admin"
         ? `Using your admin studio: ${trimmedName}`
         : `Joined studio: ${trimmedName}. Kiln and Pottery admin settings are only available to this studio admin.`,
     );
+    setJoinStudioName(trimmedName);
     setJoinStudioPassword("");
     setIsSubmittingStudio(false);
   };
@@ -349,17 +430,55 @@ export default function AdminPage() {
     const trimmedName = newStudioName.trim();
     const trimmedPassword = newStudioPassword.trim();
 
-    if (!trimmedName || !trimmedPassword) {
-      setStudioError("Studio name and password are required to create a studio.");
+    if (!trimmedPassword) {
+      setStudioError(ownedStudio ? "A new password is required to update your studio." : "Studio name and password are required to create a studio.");
       return;
     }
 
     if (!user?.id) {
-      setStudioError("You must be signed in to create a studio.");
+      setStudioError("You must be signed in to create or update a studio.");
+      return;
+    }
+
+    if (!ownedStudio && !trimmedName) {
+      setStudioError("Studio name and password are required to create a studio.");
+      return;
+    }
+
+    if (!ownedStudio && hasLockedStudioMembership && studioMembership?.studio_name !== trimmedName) {
+      setStudioError(`Your account is already linked to ${studioMembership?.studio_name}. Only one studio is allowed per account.`);
       return;
     }
 
     setIsSubmittingStudio(true);
+
+    if (ownedStudio) {
+      const intendedName = trimmedName || ownedStudio.name;
+      if (intendedName !== ownedStudio.name) {
+        setStudioError("Studio admins can only update password for their existing studio in this flow.");
+        setIsSubmittingStudio(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from("Studios")
+        .update({ password: trimmedPassword })
+        .eq("id", ownedStudio.id)
+        .eq("admin_user_id", user.id);
+
+      if (error) {
+        setStudioError("Unable to update studio password right now. Please try again.");
+        setIsSubmittingStudio(false);
+        return;
+      }
+
+      setStudioSuccess(`Studio password updated for ${ownedStudio.name}. Members will need to use the new password.`);
+      setNewStudioName(ownedStudio.name);
+      setNewStudioPassword("");
+      await fetchStudios();
+      setIsSubmittingStudio(false);
+      return;
+    }
 
     const { error } = await supabase.from("Studios").insert({
       name: trimmedName,
@@ -377,10 +496,26 @@ export default function AdminPage() {
       return;
     }
 
+    const { error: membershipError } = await supabase.from("StudioMembers").upsert(
+      {
+        user_id: user.id,
+        studio_name: trimmedName,
+        role: "admin",
+      },
+      { onConflict: "user_id" },
+    );
+
+    if (membershipError) {
+      setStudioError("Studio created, but failed to save account studio membership.");
+      setIsSubmittingStudio(false);
+      return;
+    }
+
+    setStudioMembership({ user_id: user.id, studio_name: trimmedName, role: "admin" });
     setStudioSuccess(`Studio created: ${trimmedName}`);
     setActiveStudioName(trimmedName);
     setJoinStudioName(trimmedName);
-    setNewStudioName("");
+    setNewStudioName(trimmedName);
     setNewStudioPassword("");
     await fetchStudios();
     setIsSubmittingStudio(false);
@@ -388,6 +523,10 @@ export default function AdminPage() {
 
   // We need to populate Supabase-backed admin tables on mount; state updates are contained within each fetch helper.
   /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    void fetchStudioMembership();
+  }, [fetchStudioMembership]);
+
   useEffect(() => {
     void fetchStudios();
   }, [fetchStudios]);
@@ -655,6 +794,7 @@ export default function AdminPage() {
                         className={selectClassName}
                         value={activeStudioName ?? ""}
                         onChange={(event) => setActiveStudioName(event.target.value || null)}
+                        disabled={hasLockedStudioMembership}
                       >
                         <option value="" disabled>
                           Select a studio
@@ -689,7 +829,11 @@ export default function AdminPage() {
                     />
                   </div>
 
-                  <Button type="button" onClick={() => void handleJoinStudio()} disabled={isSubmittingStudio}>
+                  <Button
+                    type="button"
+                    onClick={() => void handleJoinStudio()}
+                    disabled={isSubmittingStudio || (hasLockedStudioMembership && studioMembership?.studio_name !== joinStudioName.trim())}
+                  >
                     {isSubmittingStudio ? "Joining..." : "Join studio"}
                   </Button>
                 </CardContent>
@@ -703,6 +847,12 @@ export default function AdminPage() {
                   <CardDescription>Create a new studio space and set an initial access password.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {ownedStudio ? (
+                    <p className="text-sm text-muted-foreground">
+                      You already own {ownedStudio.name}. Use this form to update the studio password.
+                    </p>
+                  ) : null}
+
                   <div className="space-y-2">
                     <Label htmlFor="new-studio-name">Studio Name</Label>
                     <Input
@@ -710,6 +860,7 @@ export default function AdminPage() {
                       placeholder="Enter a new studio name"
                       value={newStudioName}
                       onChange={(event) => setNewStudioName(event.target.value)}
+                      readOnly={Boolean(ownedStudio)}
                     />
                   </div>
 
@@ -725,7 +876,7 @@ export default function AdminPage() {
                   </div>
 
                   <Button type="button" onClick={() => void handleCreateStudio()} disabled={isSubmittingStudio}>
-                    {isSubmittingStudio ? "Creating..." : "Create studio"}
+                    {isSubmittingStudio ? (ownedStudio ? "Updating..." : "Creating...") : ownedStudio ? "Update studio password" : "Create studio"}
                   </Button>
                 </CardContent>
               </Card>

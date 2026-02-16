@@ -18,6 +18,18 @@ comment on column public."Studios".name is 'Unique studio name used to join a st
 comment on column public."Studios".password is 'Shared studio password used to join the studio.';
 comment on column public."Studios".admin_user_id is 'Clerk user id (or app user id) of the studio admin.';
 
+create table if not exists public."StudioMembers" (
+  id uuid primary key default uuid_generate_v4(),
+  user_id text not null unique,
+  studio_name text not null references public."Studios"(name) on update cascade,
+  role text not null check (role in ('admin', 'member')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists studio_members_user_id_idx on public."StudioMembers"(user_id);
+create index if not exists studio_members_studio_name_idx on public."StudioMembers"(studio_name);
+
 create table if not exists public."Kilns" (
   id uuid primary key default uuid_generate_v4(),
   studio_name text not null references public."Studios"(name) on update cascade,

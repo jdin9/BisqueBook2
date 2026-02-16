@@ -12,6 +12,18 @@ create table if not exists public."Studios" (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public."StudioMembers" (
+  id uuid primary key default uuid_generate_v4(),
+  user_id text not null unique,
+  studio_name text not null references public."Studios"(name) on update cascade,
+  role text not null check (role in ('admin', 'member')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists studio_members_user_id_idx on public."StudioMembers"(user_id);
+create index if not exists studio_members_studio_name_idx on public."StudioMembers"(studio_name);
+
 alter table if exists public."Kilns"
   add column if not exists studio_name text references public."Studios"(name) on update cascade;
 
