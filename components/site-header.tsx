@@ -11,7 +11,7 @@ export function SiteHeader() {
             BB
           </div>
           <div className="flex flex-col">
-            <Link href="/" className="text-lg font-semibold leading-tight">
+            <Link href="/pottery" className="text-lg font-semibold leading-tight">
               BisqueBook 2
             </Link>
             <span className="text-sm text-muted-foreground">
