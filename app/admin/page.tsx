@@ -436,23 +436,56 @@ export default function AdminPage() {
         </TabsList>
 
         <TabsContent value="studio" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Studio access</CardTitle>
-              <CardDescription>Define shared details for sign-ins around the studio.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="studio-name">Studio Name</Label>
-                <Input id="studio-name" placeholder="Enter studio name" />
-              </div>
+          <Tabs defaultValue="join-studio" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="join-studio">Join an existing studio</TabsTrigger>
+              <TabsTrigger value="start-studio">Start a new studio</TabsTrigger>
+            </TabsList>
 
-              <div className="space-y-2">
-                <Label htmlFor="studio-password">Studio Password</Label>
-                <Input id="studio-password" type="password" placeholder="Enter studio password" />
-              </div>
-            </CardContent>
-          </Card>
+            <TabsContent value="join-studio">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Join an existing studio</CardTitle>
+                  <CardDescription>Use the studio credentials shared by your studio admin.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="join-studio-name">Studio Name</Label>
+                    <Input id="join-studio-name" placeholder="Enter studio name" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="join-studio-password">Studio Password</Label>
+                    <Input id="join-studio-password" type="password" placeholder="Enter studio password" />
+                  </div>
+
+                  <Button type="button">Join studio</Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="start-studio">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Start a new studio</CardTitle>
+                  <CardDescription>Create a new studio space and set an initial access password.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-studio-name">Studio Name</Label>
+                    <Input id="new-studio-name" placeholder="Enter a new studio name" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="new-studio-password">Studio Password</Label>
+                    <Input id="new-studio-password" type="password" placeholder="Create a studio password" />
+                  </div>
+
+                  <Button type="button">Create studio</Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="kiln" className="space-y-4">
