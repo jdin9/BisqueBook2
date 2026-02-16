@@ -18,6 +18,7 @@ comment on column public."Cones".temperature is 'Target temperature (°F) for th
 create table if not exists public."Projects" (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid not null references auth.users(id) on delete cascade,
+  studio_name text not null references public."Studios"(name) on update cascade,
   clay_id uuid not null references public."Clays"(id),
   title text not null,
   notes text,
@@ -28,6 +29,7 @@ create table if not exists public."Projects" (
 
 comment on table public."Projects" is 'User-created pottery projects.';
 comment on column public."Projects".user_id is 'Maker; references auth.users.';
+comment on column public."Projects".studio_name is 'Studio this project belongs to.';
 comment on column public."Projects".clay_id is 'References Clays table.';
 
 -- Activities (glaze or fire) that belong to projects.
@@ -35,6 +37,7 @@ create table if not exists public."Activities" (
   id uuid primary key default uuid_generate_v4(),
   project_id uuid not null references public."Projects"(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
+  studio_name text not null references public."Studios"(name) on update cascade,
   type text not null check (type in ('glaze', 'fire')),
   glaze_id uuid references public."Glazes"(id),
   coats integer,
@@ -51,6 +54,7 @@ create table if not exists public."Activities" (
 
 comment on table public."Activities" is 'Glazing and firing events tied to projects.';
 comment on column public."Activities".type is 'glaze or fire activity discriminator.';
+comment on column public."Activities".studio_name is 'Studio this activity belongs to.';
 comment on column public."Activities".glaze_id is 'References Glazes when type = glaze.';
 comment on column public."Activities".cone is 'References Cones when type = fire.';
 
@@ -81,9 +85,11 @@ comment on table public."ProjectPhotos" is 'References to project-level photos s
 -- Helpful indexes for filtering/searching.
 create index if not exists projects_clay_id_idx on public."Projects"(clay_id);
 create index if not exists projects_user_id_idx on public."Projects"(user_id);
+create index if not exists projects_studio_name_idx on public."Projects"(studio_name);
 create index if not exists projects_archived_idx on public."Projects"(archived);
 
 create index if not exists activities_project_id_idx on public."Activities"(project_id);
+create index if not exists activities_studio_name_idx on public."Activities"(studio_name);
 create index if not exists activities_type_idx on public."Activities"(type);
 create index if not exists activities_glaze_id_idx on public."Activities"(glaze_id);
 create index if not exists activities_cone_idx on public."Activities"(cone);
