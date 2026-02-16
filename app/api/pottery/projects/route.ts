@@ -28,6 +28,7 @@ export async function POST(request: Request) {
     const title = (formData.get("projectName") as string | null)?.trim();
     const clayId = (formData.get("clayId") as string | null)?.trim();
     const notes = (formData.get("notes") as string | null)?.trim() || null;
+    const studioName = (formData.get("studioName") as string | null)?.trim() || null;
     const photos = formData.getAll("photos").filter((file): file is File => file instanceof File && file.size > 0);
 
     if (!title || !clayId) {
