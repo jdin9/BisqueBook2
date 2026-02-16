@@ -1,20 +1,37 @@
--- Admin tables for kilns, clays, and glazes.
+-- Admin tables for studios, kilns, clays, and glazes.
 -- Run in Supabase SQL editor or with `psql` against your Supabase database.
 -- Note: requires the `uuid-ossp` extension for uuid_generate_v4().
 
 create extension if not exists "uuid-ossp";
 
+create table if not exists public."Studios" (
+  id uuid primary key default uuid_generate_v4(),
+  name text not null unique,
+  password text not null,
+  admin_user_id text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+comment on table public."Studios" is 'Studio-level access table for admin and member workflows.';
+comment on column public."Studios".name is 'Unique studio name used to join a studio.';
+comment on column public."Studios".password is 'Shared studio password used to join the studio.';
+comment on column public."Studios".admin_user_id is 'Clerk user id (or app user id) of the studio admin.';
+
 create table if not exists public."Kilns" (
   id uuid primary key default uuid_generate_v4(),
+  studio_name text not null references public."Studios"(name) on update cascade,
   kiln_id text not null,
   kiln_type text not null check (kiln_type in ('manual', 'digital')),
   controls text check (controls in ('dials', 'switches')),
   dial_settings text[],
   switch_count integer check (switch_count > 0),
-  status text not null check (status in ('active', 'retired'))
+  status text not null check (status in ('active', 'retired')),
+  unique (studio_name, kiln_id)
 );
 
 comment on table public."Kilns" is 'Kiln definitions for the admin UI.';
+comment on column public."Kilns".studio_name is 'Studio this kiln belongs to.';
 comment on column public."Kilns".kiln_id is 'Freeform kiln identifier shown in the admin UI.';
 comment on column public."Kilns".kiln_type is 'manual or digital';
 comment on column public."Kilns".controls is 'dials or switches when kiln_type = manual';
@@ -24,32 +41,57 @@ comment on column public."Kilns".status is 'active or retired';
 
 create table if not exists public."Clays" (
   id uuid primary key default uuid_generate_v4(),
+  studio_name text not null references public."Studios"(name) on update cascade,
   clay_body text not null,
-  status text not null check (status in ('active', 'retired'))
+  status text not null check (status in ('active', 'retired')),
+  unique (studio_name, clay_body)
 );
 
 comment on table public."Clays" is 'Clay bodies tracked from the pottery admin tab.';
+comment on column public."Clays".studio_name is 'Studio this clay body belongs to.';
 comment on column public."Clays".clay_body is 'Named clay body (e.g., B-Mix).';
 comment on column public."Clays".status is 'active or retired';
 
 create table if not exists public."Glazes" (
   id uuid primary key default uuid_generate_v4(),
+  studio_name text not null references public."Studios"(name) on update cascade,
   glaze_name text not null,
   brand text not null,
-  status text not null check (status in ('active', 'retired'))
+  status text not null check (status in ('active', 'retired')),
+  unique (studio_name, glaze_name, brand)
 );
 
 comment on table public."Glazes" is 'Glazes tracked from the pottery admin tab.';
+comment on column public."Glazes".studio_name is 'Studio this glaze belongs to.';
 comment on column public."Glazes".glaze_name is 'Named glaze (e.g., Chun Blue).';
 comment on column public."Glazes".brand is 'Glaze manufacturer or studio mix label.';
 comment on column public."Glazes".status is 'active or retired';
 
+create index if not exists studios_name_idx on public."Studios"(name);
+create index if not exists kilns_studio_name_idx on public."Kilns"(studio_name);
+create index if not exists clays_studio_name_idx on public."Clays"(studio_name);
+create index if not exists glazes_studio_name_idx on public."Glazes"(studio_name);
+
 -- Enable RLS for admin tables to keep Supabase consistent with the pottery schema.
+alter table public."Studios" enable row level security;
 alter table public."Kilns" enable row level security;
 alter table public."Clays" enable row level security;
 alter table public."Glazes" enable row level security;
 
 -- Allow both anon and authenticated roles to read and manage admin tables (no deletes).
+do $$
+begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'Studios' and policyname = 'Studios select all') then
+    create policy "Studios select all" on public."Studios" for select using (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'Studios' and policyname = 'Studios insert all') then
+    create policy "Studios insert all" on public."Studios" for insert to anon, authenticated with check (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'Studios' and policyname = 'Studios update all') then
+    create policy "Studios update all" on public."Studios" for update to anon, authenticated using (true) with check (true);
+  end if;
+end$$;
+
 do $$
 begin
   if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'Kilns' and policyname = 'Kilns select all') then

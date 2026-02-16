@@ -54,6 +54,17 @@ export async function POST(request: Request) {
     const supabase = getSupabaseServiceRoleClient();
     const bucket = await ensureStorageBucketExists(process.env.SUPABASE_STORAGE_BUCKET || "attachments");
 
+    const { data: projectLookup, error: projectLookupError } = await supabase
+      .from("Projects")
+      .select("studio_name")
+      .eq("id", projectId)
+      .single();
+
+    if (projectLookupError) {
+      console.error("Failed to look up project studio", projectLookupError);
+      return NextResponse.json({ error: "Unable to resolve project studio." }, { status: 500 });
+    }
+
     const { data: existingUsers, error: listUsersError } = await supabase.auth.admin.listUsers();
 
     if (listUsersError) {
@@ -104,6 +115,7 @@ export async function POST(request: Request) {
         coats: type === "glaze" ? coats : null,
         cone: type === "fire" ? cone : null,
         notes,
+        studio_name: (projectLookup?.studio_name as string | null) ?? null,
       })
       .select("id, created_at")
       .single();
